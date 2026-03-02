@@ -256,19 +256,36 @@ const ImagePreview = memo(function ImagePreview({
 
       const step = previewZoomStep / 100;
       const delta = e.deltaY > 0 ? -step : step;
-      ps.current.scale = Math.max(
-        MIN_SCALE,
-        Math.min(MAX_SCALE, ps.current.scale + delta),
-      );
 
       getPreviewWindowRect(previewPosition)
         .then((rect) => {
+          const maxW = rect.w / rect.scale;
+          const maxH = rect.h / rect.scale;
+
+          // Compute base size at scale=1 (mirrors calcImageSize logic)
+          const { imgNatural } = ps.current;
+          let baseW = imgNatural.w;
+          let baseH = imgNatural.h;
+          if (baseW > BASE_PREVIEW_W || baseH > BASE_PREVIEW_H) {
+            const r = Math.min(BASE_PREVIEW_W / baseW, BASE_PREVIEW_H / baseH);
+            baseW *= r;
+            baseH *= r;
+          }
+
+          // Max scale where the image exactly fills available space
+          const maxEffective = Math.min(maxW / baseW, maxH / baseH, MAX_SCALE);
+
+          ps.current.scale = Math.max(
+            MIN_SCALE,
+            Math.min(maxEffective, ps.current.scale + delta),
+          );
+
           const { width, height } = calcImageSize(
-            ps.current.imgNatural.w,
-            ps.current.imgNatural.h,
+            imgNatural.w,
+            imgNatural.h,
             ps.current.scale,
-            rect.w / rect.scale,
-            rect.h / rect.scale,
+            maxW,
+            maxH,
           );
           const percent = Math.round(ps.current.scale * 100);
           return emit("image-preview-zoom", {
