@@ -112,8 +112,9 @@ export function ClipboardList() {
     [itemsWithSortId],
   );
 
-  // 搜索/筛选时隐藏快捷粘贴序号（过滤后的顺序与快捷粘贴的全局顺序不一致）
-  const showSlotBadges = !searchQuery && !selectedGroup && selectedGroupId === null;
+  // 搜索/类型筛选时隐藏快捷粘贴序号（过滤后的顺序与快捷粘贴槽位顺序不一致）
+  // 自定义分组下仍显示序号：quick_paste 是分组隔离的，序号与当前视图一致
+  const showSlotBadges = !searchQuery && !selectedGroup;
 
   const handleDragEnd = useCallback(
     async (oldIndex: number, newIndex: number) => {

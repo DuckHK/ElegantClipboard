@@ -229,10 +229,10 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
   },
 
   resetView: async () => {
+    // 仅重置搜索和类型筛选，保留分组选择
     set((state) => ({
       searchQuery: "",
       selectedGroup: null,
-      selectedGroupId: null,
       _resetToken: state._resetToken + 1,
     }));
     await get().fetchItems({ search: "" });

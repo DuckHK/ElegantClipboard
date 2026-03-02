@@ -878,6 +878,14 @@ impl GroupRepository {
         Ok(())
     }
 
+    /// 删除所有自定义分组（及其关联条目通过 ON DELETE CASCADE 一并删除）
+    pub fn delete_all(&self) -> Result<(), rusqlite::Error> {
+        let conn = self.write_conn.lock();
+        conn.execute("DELETE FROM groups", [])?;
+        debug!("Deleted all groups");
+        Ok(())
+    }
+
     /// 将条目移动到指定分组（None = 移回默认分组）
     pub fn move_item_to_group(&self, item_id: i64, group_id: Option<i64>) -> Result<(), rusqlite::Error> {
         let conn = self.write_conn.lock();

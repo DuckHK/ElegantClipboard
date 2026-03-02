@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { create } from "zustand";
 import { logError } from "@/lib/logger";
+import { useClipboardStore } from "@/stores/clipboard";
 
 export interface Group {
   id: number;
@@ -88,8 +89,9 @@ export const useGroupStore = create<GroupState>((set, get) => ({
   moveItemToGroup: async (itemId, groupId) => {
     try {
       await invoke("move_item_to_group", { itemId, groupId });
-      // 刷新分组列表以更新 item_count
+      // 刷新分组列表以更新 item_count，并刷新剪贴板列表移除已移走的条目
       get().fetchGroups();
+      useClipboardStore.getState().fetchItems();
     } catch (error) {
       logError("Failed to move item to group:", error);
     }

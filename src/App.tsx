@@ -94,16 +94,23 @@ function App() {
     fetchGroups();
   }, []);
 
-  // 对话框打开后主动聚焦输入框（autoFocus 在 Tauri WebView portal 中不可靠）
+  // 对话框打开后主动恢复 Tauri 窗口键盘焦点并聚焦输入框
+  // （直接点击分组按钮会触发 debouncedRestoreFocus 释放键盘焦点，需在此重新获取）
   useEffect(() => {
     if (!createDialogOpen) return;
-    const t = setTimeout(() => createInputRef.current?.focus(), 80);
+    const t = setTimeout(async () => {
+      await focusWindowImmediately();
+      createInputRef.current?.focus();
+    }, 80);
     return () => clearTimeout(t);
   }, [createDialogOpen]);
 
   useEffect(() => {
     if (!renameDialogOpen) return;
-    const t = setTimeout(() => renameInputRef.current?.focus(), 80);
+    const t = setTimeout(async () => {
+      await focusWindowImmediately();
+      renameInputRef.current?.focus();
+    }, 80);
     return () => clearTimeout(t);
   }, [renameDialogOpen]);
 
@@ -115,7 +122,12 @@ function App() {
         setGroupDropdownOpen(false);
       }
     };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setGroupDropdownOpen(false); };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setGroupDropdownOpen(false);
+        e.stopImmediatePropagation(); // 仅关闭下拉，不触发窗口隐藏
+      }
+    };
     document.addEventListener('mousedown', onPointerDown);
     document.addEventListener('keydown', onKey);
     return () => {
@@ -246,6 +258,7 @@ function App() {
   useEffect(() => {
     const unlisten = listen("window-hidden", () => {
       dismissOverlays();
+      setGroupDropdownOpen(false);
       if (autoResetState) {
         resetView();
       }
@@ -555,7 +568,7 @@ function App() {
           <DialogHeader className="text-left">
             <DialogTitle>清空历史记录</DialogTitle>
             <DialogDescription className="text-left">
-              确定要清空所有非置顶的历史记录吗？此操作不可撤销。
+              确定要清空当前分组内所有非置顶的历史记录吗？此操作不可撤销。
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
