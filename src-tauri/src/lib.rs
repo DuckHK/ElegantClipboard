@@ -1159,6 +1159,8 @@ async fn open_text_editor_window(app: tauri::AppHandle, id: i64) -> Result<(), S
     .inner_size(600.0, 460.0)
     .min_inner_size(400.0, 300.0)
     .decorations(false)
+    .transparent(true)
+    .shadow(true)
     .visible(false)
     .resizable(true)
     .center()
