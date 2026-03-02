@@ -1079,6 +1079,7 @@ async fn show_image_preview(
     win_y: f64,
     win_width: f64,
     win_height: f64,
+    align: Option<String>,
 ) -> Result<(), String> {
     let mut newly_created = false;
     let window = if let Some(w) = app.get_webview_window("image-preview") {
@@ -1124,6 +1125,7 @@ async fn show_image_preview(
             "imagePath": image_path,
             "width": img_width,
             "height": img_height,
+            "align": align.as_deref().unwrap_or("left"),
         }),
     );
 

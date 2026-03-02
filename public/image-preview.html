@@ -13,8 +13,10 @@
       -webkit-user-select: none;
       display: flex;
       align-items: center;
-      justify-content: center;
+      justify-content: flex-start;
     }
+    body.align-right { justify-content: flex-end; }
+    body.align-center { justify-content: center; }
     #wrap {
       position: relative;
       display: inline-block;
@@ -79,16 +81,18 @@
       const { convertFileSrc } = window.__TAURI__.core;
 
       listen('image-preview-update', (event) => {
-        const { imagePath, width, height } = event.payload;
+        const { imagePath, width, height, align } = event.payload;
         img.classList.remove('loaded');
         clearBadge();
+        document.body.className = align === 'right' ? 'align-right' : '';
         wrap.style.width = width + 'px';
         wrap.style.height = height + 'px';
         img.src = convertFileSrc(imagePath);
       });
 
       listen('image-preview-zoom', (event) => {
-        const { width, height, percent, active } = event.payload;
+        const { width, height, percent, active, align } = event.payload;
+        if (align) document.body.className = align === 'right' ? 'align-right' : '';
         wrap.style.width = width + 'px';
         wrap.style.height = height + 'px';
         if (active) showBadge(percent + '%');

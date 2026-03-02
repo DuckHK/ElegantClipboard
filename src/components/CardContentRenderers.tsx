@@ -114,6 +114,7 @@ async function getPreviewWindowRect(position: "auto" | "left" | "right") {
       w: Math.max(physMinW, leftSpace),
       h: monH,
       scale,
+      side: "left" as const,
     };
   }
   return {
@@ -122,6 +123,7 @@ async function getPreviewWindowRect(position: "auto" | "left" | "right") {
     w: Math.max(physMinW, rightSpace),
     h: monH,
     scale,
+    side: "right" as const,
   };
 }
 
@@ -223,6 +225,8 @@ const ImagePreview = memo(function ImagePreview({
 
     ps.current.visible = true;
     ps.current.scale = 1.0;
+    // side: "left" 表示预览在左侧，图片靠右对齐（贴近剪贴板）；"right" 反之
+    const align = rect.side === "left" ? "right" : "left";
     try {
       await invoke("show_image_preview", {
         imagePath: ps.current.currentPath,
@@ -232,6 +236,7 @@ const ImagePreview = memo(function ImagePreview({
         winY: rect.y,
         winWidth: rect.w,
         winHeight: rect.h,
+        align,
       });
     } catch {
       ps.current.visible = false;
@@ -288,11 +293,13 @@ const ImagePreview = memo(function ImagePreview({
             maxH,
           );
           const percent = Math.round(ps.current.scale * 100);
+          const zoomAlign = rect.side === "left" ? "right" : "left";
           return emit("image-preview-zoom", {
             width,
             height,
             percent,
             active: true,
+            align: zoomAlign,
           });
         })
         .catch((e) => logError("Failed to update zoom:", e));
