@@ -9,7 +9,7 @@ import {
 } from "@fluentui/react-icons";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
-import { currentMonitor } from "@tauri-apps/api/window";
+import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { HighlightText } from "@/components/HighlightText";
 import { getFileNameFromPath, isImageFile } from "@/lib/format";
 import { logError } from "@/lib/logger";
@@ -101,32 +101,50 @@ async function getPreviewBounds(
   position: "auto" | "left" | "right",
   cardElement?: HTMLElement | null,
 ): Promise<PreviewBounds> {
-  const winX = window.screenX ?? window.screenLeft ?? 0;
-  const winY = window.screenY ?? window.screenTop ?? 0;
-  const mainW = window.innerWidth || 380;
-  const mainH = window.innerHeight || 600;
-
-  const monitor = await currentMonitor();
+  // Fetch physical coordinates in parallel to reduce latency
+  const appWindow = getCurrentWindow();
+  const [monitor, outerPos, outerSize] = await Promise.all([
+    currentMonitor(),
+    appWindow.outerPosition(),
+    appWindow.outerSize(),
+  ]);
   const monX = monitor?.position.x ?? 0;
   const monY = monitor?.position.y ?? 0;
   const scale = monitor?.scaleFactor ?? 1;
+  const physWinX = outerPos.x;
+  const physWinY = outerPos.y;
+  const physMainW = outerSize.width;
+  const physMainH = outerSize.height;
 
-  // Use work area (excludes taskbar) instead of full monitor
-  const scr = window.screen as Screen & { availTop?: number; availLeft?: number };
-  const workX = monX + Math.round((scr.availLeft ?? 0) * scale);
-  const workY = monY + Math.round((scr.availTop ?? 0) * scale);
+  // Work area: compute taskbar offset within the monitor from screen.availLeft/Top vs screen.left/top
+  const scr = window.screen as Screen & {
+    availTop?: number; availLeft?: number;
+    left?: number; top?: number;
+  };
+  // screen.left/top = monitor logical position (Chromium-specific)
+  // If unavailable, fall back to 0 offset (assume no taskbar inset) rather than
+  // using availLeft/availTop which are global coords and would produce a wrong delta.
+  const hasScreenLeft = scr.left != null;
+  const hasScreenTop = scr.top != null;
+  const workOffsetX = hasScreenLeft && scr.availLeft != null
+    ? Math.round((scr.availLeft - scr.left!) * scale)
+    : 0;
+  const workOffsetY = hasScreenTop && scr.availTop != null
+    ? Math.round((scr.availTop - scr.top!) * scale)
+    : 0;
+  const workX = monX + workOffsetX;
+  const workY = monY + workOffsetY;
   const workW = Math.round((scr.availWidth ?? scr.width) * scale);
   const workH = Math.round((scr.availHeight ?? scr.height) * scale);
 
-  const physWinX = Math.round(winX * scale);
-  const physMainW = Math.round(mainW * scale);
   const physGap = Math.round(PREVIEW_GAP * scale);
   const physMinW = Math.round(200 * scale);
 
-  let cardCenterY = Math.round((winY + mainH / 2) * scale);
+  // Card center Y: use physical window position + viewport-relative card offset
+  let cardCenterY = physWinY + Math.round(physMainH / 2);
   if (cardElement) {
     const rect = cardElement.getBoundingClientRect();
-    cardCenterY = Math.round((winY + rect.top + rect.height / 2) * scale);
+    cardCenterY = physWinY + Math.round((rect.top + rect.height / 2) * scale);
   }
 
   const leftSpace = physWinX - workX - physGap;
