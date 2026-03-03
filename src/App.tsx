@@ -157,13 +157,14 @@ function App() {
     return () => ro.disconnect();
   }, [updateIndicator]);
 
-  // 隐藏分类栏时重置全部筛选状态
+  // Reset filters when category bar is hidden.
   useEffect(() => {
     if (!showCategoryFilter) {
-      useClipboardStore.setState({ selectedGroup: null, selectedGroupId: null });
-      useClipboardStore.getState().fetchItems();
+      // Keep frontend/backend active group in sync when filter bar is hidden.
+      useClipboardStore.setState({ selectedGroup: null });
+      setSelectedGroupId(null);
     }
-  }, [showCategoryFilter]);
+  }, [showCategoryFilter, setSelectedGroupId]);
 
   // ---- 分组操作 handlers ----
   const handleCreateGroup = async () => {

@@ -289,6 +289,17 @@ impl Database {
             info!("Migration complete: group_id column added, table rebuilt");
         }
 
+        // Migration 7: allow duplicate content_hash entries for dedup_strategy=always_new.
+        // Keep hash indexes for lookup performance, but remove uniqueness constraints.
+        conn.execute_batch(
+            "DROP INDEX IF EXISTS idx_clipboard_hash_default;
+             DROP INDEX IF EXISTS idx_clipboard_hash_group;
+             CREATE INDEX IF NOT EXISTS idx_clipboard_hash_default
+               ON clipboard_items(content_hash) WHERE group_id IS NULL;
+             CREATE INDEX IF NOT EXISTS idx_clipboard_hash_group
+               ON clipboard_items(group_id, content_hash) WHERE group_id IS NOT NULL;",
+        )?;
+
         Ok(())
     }
 

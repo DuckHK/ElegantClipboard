@@ -86,7 +86,11 @@ unsafe extern "system" fn wndproc_subclass(
     }
 
     let original = ORIGINAL_WNDPROC.load(Ordering::Relaxed);
-    CallWindowProcW(std::mem::transmute(original), hwnd, msg, wparam, lparam)
+    let original_proc = std::mem::transmute::<
+        isize,
+        Option<unsafe extern "system" fn(HWND, u32, WPARAM, LPARAM) -> LRESULT>,
+    >(original);
+    CallWindowProcW(original_proc, hwnd, msg, wparam, lparam)
 }
 
 pub fn init(window: WebviewWindow) {

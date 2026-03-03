@@ -192,35 +192,34 @@ impl ClipboardRepository {
         let new_sort = max_sort_order + 1;
 
         let (group_cond, group_param) = Self::group_condition(group_id);
-        let update_sql = format!(
-            "UPDATE clipboard_items \
-             SET access_count = access_count + 1, \
-                 last_accessed_at = datetime('now', 'localtime'), \
-                 updated_at = datetime('now', 'localtime'), \
-                 created_at = datetime('now', 'localtime'), \
-                 sort_order = ? \
-             WHERE content_hash = ? AND {}",
-            group_cond
-        );
         let select_sql = format!(
-            "SELECT id FROM clipboard_items WHERE content_hash = ? AND {}",
+            "SELECT id FROM clipboard_items \
+             WHERE content_hash = ? AND {} \
+             ORDER BY sort_order DESC, created_at DESC, id DESC \
+             LIMIT 1",
             group_cond
         );
 
-        if let Some(gid) = group_param {
-            conn.execute(&update_sql, params![new_sort, hash, gid])?;
-        } else {
-            conn.execute(&update_sql, params![new_sort, hash])?;
-        }
-
-        let result: Result<i64, _> = if let Some(gid) = group_param {
+        let target_id: Result<i64, _> = if let Some(gid) = group_param {
             conn.query_row(&select_sql, params![hash, gid], |row| row.get(0))
         } else {
             conn.query_row(&select_sql, params![hash], |row| row.get(0))
         };
 
-        match result {
-            Ok(id) => Ok(Some(id)),
+        match target_id {
+            Ok(id) => {
+                conn.execute(
+                    "UPDATE clipboard_items \
+                     SET access_count = access_count + 1, \
+                         last_accessed_at = datetime('now', 'localtime'), \
+                         updated_at = datetime('now', 'localtime'), \
+                         created_at = datetime('now', 'localtime'), \
+                         sort_order = ?1 \
+                     WHERE id = ?2",
+                    params![new_sort, id],
+                )?;
+                Ok(Some(id))
+            }
             Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
             Err(e) => Err(e),
         }
@@ -528,6 +527,20 @@ impl ClipboardRepository {
         )?;
         let paths = stmt
             .query_map([], |row| row.get::<_, String>(0))?
+            .filter_map(|r| r.ok())
+            .collect();
+        Ok(paths)
+    }
+
+    /// »ñÈ¡Ö¸¶¨·Ö×éÄÚËùÓÐÌõÄ¿µÄÍ¼Æ¬Â·¾¶£¨°üÀ¨ÖÃ¶¥ºÍÊÕ²Ø£©
+    pub fn get_image_paths_by_group(&self, group_id: i64) -> Result<Vec<String>, rusqlite::Error> {
+        let conn = self.read_conn.lock();
+        let mut stmt = conn.prepare(
+            "SELECT image_path FROM clipboard_items \
+             WHERE image_path IS NOT NULL AND group_id = ?1",
+        )?;
+        let paths = stmt
+            .query_map(params![group_id], |row| row.get::<_, String>(0))?
             .filter_map(|r| r.ok())
             .collect();
         Ok(paths)

@@ -86,6 +86,7 @@ interface ClipboardItemCardProps {
 }
 
 const clipboardActions = () => useClipboardStore.getState();
+const fileValidityCache = new Map<string, boolean>();
 
 // ============ File Details Dialog ============
 
@@ -363,12 +364,59 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   const { groups, moveItemToGroup } = useGroupStore();
   const selectedGroupId = useClipboardStore((s) => s.selectedGroupId);
 
-  const filesInvalid =
-    item.content_type === "files" && item.files_valid === false;
   const filePaths = useMemo(
     () => item.content_type === "files" ? parseFilePaths(item.file_paths) : [],
     [item.content_type, item.file_paths],
   );
+  const [runtimeFilesValid, setRuntimeFilesValid] = useState<
+    boolean | undefined
+  >(undefined);
+
+  useEffect(() => {
+    if (item.content_type !== "files") {
+      setRuntimeFilesValid(undefined);
+      return;
+    }
+
+    if (item.files_valid !== undefined) {
+      setRuntimeFilesValid(item.files_valid);
+      return;
+    }
+
+    if (filePaths.length === 0) {
+      setRuntimeFilesValid(false);
+      return;
+    }
+
+    const cacheKey = item.file_paths ?? filePaths.join("\n");
+    const cached = fileValidityCache.get(cacheKey);
+    if (cached !== undefined) {
+      setRuntimeFilesValid(cached);
+      return;
+    }
+
+    let cancelled = false;
+    invoke<Record<string, { exists: boolean; is_dir: boolean }>>(
+      "check_files_exist",
+      { paths: filePaths },
+    )
+      .then((checkResult) => {
+        const allExist = filePaths.every((path) => checkResult[path]?.exists);
+        fileValidityCache.set(cacheKey, allExist);
+        if (!cancelled) setRuntimeFilesValid(allExist);
+      })
+      .catch(() => {
+        if (!cancelled) setRuntimeFilesValid(undefined);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [item.content_type, item.files_valid, item.file_paths, filePaths]);
+
+  const effectiveFilesValid = item.files_valid ?? runtimeFilesValid;
+  const filesInvalid =
+    item.content_type === "files" && effectiveFilesValid === false;
 
   const {
     attributes,

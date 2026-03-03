@@ -477,19 +477,22 @@ async fn import_data(app: tauri::AppHandle) -> Result<String, String> {
         let mut entry = archive.by_index(i).map_err(|e| e.to_string())?;
         let name = entry.name().to_string();
 
-        // 安全检查：防止路径穿越
-        if name.contains("..") {
-            continue;
-        }
+        let rel_path = match sanitize_zip_relative_path(&name) {
+            Some(path) => path,
+            None => {
+                tracing::warn!("Skipping unsafe zip entry path: {}", name);
+                continue;
+            }
+        };
 
-        // 跳过 WAL 临时文件；clipboard.db 写为 staging 文件，启动时替换
-        if name.ends_with("-wal") || name.ends_with("-shm") {
+        // Skip transient DB files; only import clipboard.db plus asset folders.
+        if rel_path.ends_with("clipboard.db-wal") || rel_path.ends_with("clipboard.db-shm") {
             continue;
         }
-        let out_path = if name == "clipboard.db" {
+        let out_path = if rel_path == std::path::Path::new("clipboard.db") {
             data_dir.join("clipboard.db.import")
         } else {
-            data_dir.join(&name)
+            data_dir.join(&rel_path)
         };
 
         if entry.is_dir() {
@@ -510,6 +513,31 @@ async fn import_data(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 /// 检测并应用待导入的 staging 数据库文件（clipboard.db.import → clipboard.db）。
+fn sanitize_zip_relative_path(name: &str) -> Option<std::path::PathBuf> {
+    use std::path::{Component, Path, PathBuf};
+
+    let raw = Path::new(name);
+    if raw.is_absolute() {
+        return None;
+    }
+
+    let mut clean = PathBuf::new();
+    for component in raw.components() {
+        match component {
+            Component::Normal(seg) => clean.push(seg),
+            Component::CurDir => {}
+            // Reject root/prefix/parent dir to prevent zip-slip style writes.
+            Component::RootDir | Component::Prefix(_) | Component::ParentDir => return None,
+        }
+    }
+
+    if clean.as_os_str().is_empty() {
+        return None;
+    }
+
+    Some(clean)
+}
+
 fn apply_pending_import(db_path: &std::path::Path) {
     use std::fs;
 

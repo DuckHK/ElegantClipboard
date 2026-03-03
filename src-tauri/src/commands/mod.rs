@@ -79,9 +79,32 @@ static RESUME_TX: std::sync::LazyLock<std::sync::mpsc::Sender<crate::clipboard::
         std::thread::Builder::new()
             .name("monitor-resume".into())
             .spawn(move || {
-                while let Ok(monitor) = rx.recv() {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
-                    monitor.resume();
+                loop {
+                    let first = match rx.recv() {
+                        Ok(monitor) => monitor,
+                        Err(_) => return,
+                    };
+                    let mut pending = vec![first];
+
+                    // Debounce resume requests: wait for a quiet 500ms window,
+                    // then flush all pending resumes together.
+                    loop {
+                        match rx.recv_timeout(std::time::Duration::from_millis(500)) {
+                            Ok(monitor) => pending.push(monitor),
+                            Err(std::sync::mpsc::RecvTimeoutError::Timeout) => {
+                                for monitor in pending.drain(..) {
+                                    monitor.resume();
+                                }
+                                break;
+                            }
+                            Err(std::sync::mpsc::RecvTimeoutError::Disconnected) => {
+                                for monitor in pending.drain(..) {
+                                    monitor.resume();
+                                }
+                                return;
+                            }
+                        }
+                    }
                 }
             })
             .expect("failed to spawn monitor-resume thread");
