@@ -21,6 +21,7 @@ interface UISettings {
   showSourceApp: boolean;
   sourceAppDisplay: "both" | "name" | "icon";
   imagePreviewEnabled: boolean;
+  previewUnboundedMode: boolean;
   previewZoomStep: number;
   previewPosition: "auto" | "left" | "right";
   imageAutoHeight: boolean;
@@ -51,6 +52,7 @@ interface UISettings {
   setShowSourceApp: (show: boolean) => void;
   setSourceAppDisplay: (mode: "both" | "name" | "icon") => void;
   setImagePreviewEnabled: (enabled: boolean) => void;
+  setPreviewUnboundedMode: (enabled: boolean) => void;
   setPreviewZoomStep: (step: number) => void;
   setPreviewPosition: (pos: "auto" | "left" | "right") => void;
   setImageAutoHeight: (auto: boolean) => void;
@@ -93,6 +95,7 @@ export const useUISettings = create<UISettings>()(
       showSourceApp: true,
       sourceAppDisplay: "both" as "both" | "name" | "icon",
       imagePreviewEnabled: false,
+      previewUnboundedMode: false,
       previewZoomStep: 15,
       previewPosition: "auto" as "auto" | "left" | "right",
       imageAutoHeight: true,
@@ -142,6 +145,10 @@ export const useUISettings = create<UISettings>()(
       setImagePreviewEnabled: (enabled) => {
         set({ imagePreviewEnabled: enabled });
         broadcastChange({ imagePreviewEnabled: enabled });
+      },
+      setPreviewUnboundedMode: (enabled) => {
+        set({ previewUnboundedMode: enabled });
+        broadcastChange({ previewUnboundedMode: enabled });
       },
       setPreviewZoomStep: (step) => {
         set({ previewZoomStep: step });

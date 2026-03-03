@@ -131,6 +131,7 @@ export function DisplayTab() {
     imageAutoHeight, setImageAutoHeight,
     imageMaxHeight, setImageMaxHeight,
     imagePreviewEnabled, setImagePreviewEnabled,
+    previewUnboundedMode, setPreviewUnboundedMode,
     previewZoomStep, setPreviewZoomStep,
     previewPosition, setPreviewPosition,
     hoverPreviewDelay, setHoverPreviewDelay,
@@ -339,6 +340,16 @@ export function DisplayTab() {
 
           {imagePreviewEnabled && (
             <>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label className="text-xs">无界模式</Label>
+                  <p className="text-xs text-muted-foreground">
+                    允许预览窗口超出屏幕边界，最高缩放至 500%
+                  </p>
+                </div>
+                <Switch checked={previewUnboundedMode} onCheckedChange={setPreviewUnboundedMode} />
+              </div>
+
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label className="text-xs">预览位置</Label>
