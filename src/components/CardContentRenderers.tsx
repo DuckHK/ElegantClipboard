@@ -8,7 +8,7 @@ import {
   Warning16Regular,
 } from "@fluentui/react-icons";
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
-import { emit } from "@tauri-apps/api/event";
+import { emitTo } from "@tauri-apps/api/event";
 import { currentMonitor } from "@tauri-apps/api/window";
 import { HighlightText } from "@/components/HighlightText";
 import { getFileNameFromPath, isImageFile } from "@/lib/format";
@@ -78,44 +78,59 @@ const MAX_SCALE = 5.0;
 const BASE_PREVIEW_W = 600;
 const BASE_PREVIEW_H = 500;
 
-/** Get the fixed window rect in physical pixels: fills the available space beside the main window on its current monitor */
-async function getPreviewWindowRect(
+/** Positioning bounds for the preview window (physical pixels) */
+interface PreviewBounds {
+  /** Available width (physical px) */
+  maxW: number;
+  /** Available height (physical px) */
+  maxH: number;
+  /** Left edge X for right-side preview, or right edge X for left-side preview (physical px) */
+  anchorX: number;
+  /** Card center Y on screen (physical px) */
+  cardCenterY: number;
+  /** Monitor top Y (physical px) */
+  monY: number;
+  /** Monitor bottom Y (physical px) */
+  monBottom: number;
+  scale: number;
+  side: "left" | "right";
+}
+
+/** Get the available space bounds beside the main window for positioning the preview */
+async function getPreviewBounds(
   position: "auto" | "left" | "right",
   cardElement?: HTMLElement | null,
-) {
+): Promise<PreviewBounds> {
   const winX = window.screenX ?? window.screenLeft ?? 0;
   const winY = window.screenY ?? window.screenTop ?? 0;
   const mainW = window.innerWidth || 380;
   const mainH = window.innerHeight || 600;
 
-  // Get the monitor the main window is on (handles multi-monitor correctly)
   const monitor = await currentMonitor();
   const monX = monitor?.position.x ?? 0;
   const monY = monitor?.position.y ?? 0;
-  const monW = monitor?.size.width ?? window.screen.availWidth;
-  const monH = monitor?.size.height ?? window.screen.availHeight;
   const scale = monitor?.scaleFactor ?? 1;
 
-  // Convert CSS pixels to physical for consistent multi-DPI positioning
+  // Use work area (excludes taskbar) instead of full monitor
+  const scr = window.screen as Screen & { availTop?: number; availLeft?: number };
+  const workX = monX + Math.round((scr.availLeft ?? 0) * scale);
+  const workY = monY + Math.round((scr.availTop ?? 0) * scale);
+  const workW = Math.round((scr.availWidth ?? scr.width) * scale);
+  const workH = Math.round((scr.availHeight ?? scr.height) * scale);
+
   const physWinX = Math.round(winX * scale);
   const physMainW = Math.round(mainW * scale);
-  const physMainH = Math.round(mainH * scale);
   const physGap = Math.round(PREVIEW_GAP * scale);
   const physMinW = Math.round(200 * scale);
 
-  // Center preview window on the hovered card, clamped to monitor bounds
-  let cardCenterPhysY = Math.round((winY + mainH / 2) * scale);
+  let cardCenterY = Math.round((winY + mainH / 2) * scale);
   if (cardElement) {
     const rect = cardElement.getBoundingClientRect();
-    cardCenterPhysY = Math.round((winY + rect.top + rect.height / 2) * scale);
+    cardCenterY = Math.round((winY + rect.top + rect.height / 2) * scale);
   }
-  const previewY = Math.max(monY, Math.min(
-    cardCenterPhysY - Math.round(physMainH / 2),
-    monY + monH - physMainH,
-  ));
 
-  const leftSpace = physWinX - monX - physGap;
-  const rightSpace = monX + monW - (physWinX + physMainW) - physGap;
+  const leftSpace = physWinX - workX - physGap;
+  const rightSpace = workX + workW - (physWinX + physMainW) - physGap;
 
   const useLeft =
     position === "left"
@@ -126,21 +141,25 @@ async function getPreviewWindowRect(
 
   if (useLeft) {
     return {
-      x: monX,
-      y: previewY,
-      w: Math.max(physMinW, leftSpace),
-      h: physMainH,
+      maxW: Math.max(physMinW, leftSpace),
+      maxH: workH,
+      anchorX: physWinX - physGap, // right edge of available left space
+      cardCenterY,
+      monY: workY,
+      monBottom: workY + workH,
       scale,
-      side: "left" as const,
+      side: "left",
     };
   }
   return {
-    x: physWinX + physMainW + physGap,
-    y: previewY,
-    w: Math.max(physMinW, rightSpace),
-    h: physMainH,
+    maxW: Math.max(physMinW, rightSpace),
+    maxH: workH,
+    anchorX: physWinX + physMainW + physGap, // left edge of available right space
+    cardCenterY,
+    monY: workY,
+    monBottom: workY + workH,
     scale,
-    side: "right" as const,
+    side: "right",
   };
 }
 
@@ -176,6 +195,8 @@ interface PreviewState {
   scale: number;
   imgNatural: { w: number; h: number };
   currentPath: string | undefined;
+  /** Cached bounds from showPreview so zoom handler stays synchronous */
+  bounds: PreviewBounds | null;
 }
 
 const defaultPreviewState = (): PreviewState => ({
@@ -183,6 +204,7 @@ const defaultPreviewState = (): PreviewState => ({
   scale: 1.0,
   imgNatural: { w: BASE_PREVIEW_W, h: BASE_PREVIEW_H },
   currentPath: undefined,
+  bounds: null,
 });
 
 const ImagePreview = memo(function ImagePreview({
@@ -226,33 +248,51 @@ const ImagePreview = memo(function ImagePreview({
     ps.current.scale = 1.0;
   }, [clearTimer]);
 
-  // Show preview: open fixed-size window, send image + initial CSS size
+  // Show preview: window covers full available space (no resize on zoom)
   const showPreview = useCallback(async () => {
     if (!containerRef.current || !ps.current.currentPath) return;
-    const rect = await getPreviewWindowRect(previewPosition, containerRef.current);
+    const bounds = await getPreviewBounds(previewPosition, containerRef.current);
     const { imgNatural } = ps.current;
-    // calcImageSize needs logical max dimensions for CSS output
+    const maxCssW = bounds.maxW / bounds.scale;
+    const maxCssH = bounds.maxH / bounds.scale;
     const { width, height } = calcImageSize(
       imgNatural.w,
       imgNatural.h,
       1.0,
-      rect.w / rect.scale,
-      rect.h / rect.scale,
+      maxCssW,
+      maxCssH,
     );
+
+    // Window covers full available space (physical px) — set once, never resized
+    const winW = bounds.maxW;
+    const winH = bounds.maxH;
+    const winX = bounds.side === "left"
+      ? bounds.anchorX - winW
+      : bounds.anchorX;
+    const winY = bounds.monY;
+
+    // Image offset within window (CSS px) — vertically center on card
+    const windowCssH = winH / bounds.scale;
+    const cardOffsetInWindow = (bounds.cardCenterY - bounds.monY) / bounds.scale;
+    const offsetY = Math.max(0, Math.min(
+      cardOffsetInWindow - height / 2,
+      windowCssH - height,
+    ));
 
     ps.current.visible = true;
     ps.current.scale = 1.0;
-    // side: "left" 表示预览在左侧，图片靠右对齐（贴近剪贴板）；"right" 反之
-    const align = rect.side === "left" ? "right" : "left";
+    ps.current.bounds = bounds;
+    const align = bounds.side === "left" ? "right" : "left";
     try {
       await invoke("show_image_preview", {
         imagePath: ps.current.currentPath,
         imgWidth: width,
         imgHeight: height,
-        winX: rect.x,
-        winY: rect.y,
-        winWidth: rect.w,
-        winHeight: rect.h,
+        offsetY,
+        winX,
+        winY,
+        winWidth: winW,
+        winHeight: winH,
         align,
       });
     } catch {
@@ -269,59 +309,64 @@ const ImagePreview = memo(function ImagePreview({
     timerRef.current = setTimeout(showPreview, hoverPreviewDelay);
   }, [imagePath, imagePreviewEnabled, clearTimer, showPreview, hoverPreviewDelay]);
 
-  // Ctrl+Scroll: emit CSS size change (smooth transition in webview, no window resize)
+  // Ctrl+Scroll: CSS-only zoom via emit (no native window resize → no flicker)
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
-      if (!e.ctrlKey || !ps.current.visible) return;
+      if (!e.ctrlKey || !ps.current.visible || !ps.current.bounds) return;
       e.preventDefault();
       e.stopPropagation();
 
+      const bounds = ps.current.bounds;
+      const maxCssW = bounds.maxW / bounds.scale;
+      const maxCssH = bounds.maxH / bounds.scale;
       const step = previewZoomStep / 100;
       const delta = e.deltaY > 0 ? -step : step;
 
-      getPreviewWindowRect(previewPosition, containerRef.current)
-        .then((rect) => {
-          const maxW = rect.w / rect.scale;
-          const maxH = rect.h / rect.scale;
+      // Compute base size at scale=1 (same as initial display)
+      const { imgNatural } = ps.current;
+      let baseW = imgNatural.w;
+      let baseH = imgNatural.h;
+      if (baseW > BASE_PREVIEW_W || baseH > BASE_PREVIEW_H) {
+        const r = Math.min(BASE_PREVIEW_W / baseW, BASE_PREVIEW_H / baseH);
+        baseW *= r;
+        baseH *= r;
+      }
+      const maxEffective = Math.min(maxCssW / baseW, maxCssH / baseH, MAX_SCALE);
 
-          // Compute base size at scale=1 (mirrors calcImageSize logic)
-          const { imgNatural } = ps.current;
-          let baseW = imgNatural.w;
-          let baseH = imgNatural.h;
-          if (baseW > BASE_PREVIEW_W || baseH > BASE_PREVIEW_H) {
-            const r = Math.min(BASE_PREVIEW_W / baseW, BASE_PREVIEW_H / baseH);
-            baseW *= r;
-            baseH *= r;
-          }
+      ps.current.scale = Math.max(
+        MIN_SCALE,
+        Math.min(maxEffective, ps.current.scale + delta),
+      );
 
-          // Max scale where the image exactly fills available space
-          const maxEffective = Math.min(maxW / baseW, maxH / baseH, MAX_SCALE);
+      const { width, height } = calcImageSize(
+        imgNatural.w,
+        imgNatural.h,
+        ps.current.scale,
+        maxCssW,
+        maxCssH,
+      );
 
-          ps.current.scale = Math.max(
-            MIN_SCALE,
-            Math.min(maxEffective, ps.current.scale + delta),
-          );
+      // Recompute vertical offset for new image size
+      const windowCssH = bounds.maxH / bounds.scale;
+      const cardOffsetInWindow = (bounds.cardCenterY - bounds.monY) / bounds.scale;
+      const offsetY = Math.max(0, Math.min(
+        cardOffsetInWindow - height / 2,
+        windowCssH - height,
+      ));
 
-          const { width, height } = calcImageSize(
-            imgNatural.w,
-            imgNatural.h,
-            ps.current.scale,
-            maxW,
-            maxH,
-          );
-          const percent = Math.round(ps.current.scale * 100);
-          const zoomAlign = rect.side === "left" ? "right" : "left";
-          return emit("image-preview-zoom", {
-            width,
-            height,
-            percent,
-            active: true,
-            align: zoomAlign,
-          });
-        })
-        .catch((e) => logError("Failed to update zoom:", e));
+      const percent = Math.round(ps.current.scale * 100);
+      const zoomAlign = bounds.side === "left" ? "right" : "left";
+
+      emitTo("image-preview", "image-preview-zoom", {
+        width,
+        height,
+        offsetY,
+        percent,
+        active: true,
+        align: zoomAlign,
+      }).catch((err) => logError("Failed to emit zoom:", err));
     },
-    [previewZoomStep, previewPosition],
+    [previewZoomStep],
   );
 
   const handleImgLoad = useCallback(

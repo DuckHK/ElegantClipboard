@@ -173,16 +173,29 @@ pub async fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String>
 
 /// 启用自启动
 #[tauri::command]
-pub async fn enable_autostart(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn enable_autostart(
+    app: tauri::AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch().enable().map_err(|e| e.to_string())
+    app.autolaunch().enable().map_err(|e| e.to_string())?;
+    // 持久化偏好到数据库，安装更新后可自动恢复
+    let repo = SettingsRepository::new(&state.db);
+    let _ = repo.set("autostart_enabled", "true");
+    Ok(())
 }
 
 /// 禁用自启动
 #[tauri::command]
-pub async fn disable_autostart(app: tauri::AppHandle) -> Result<(), String> {
+pub async fn disable_autostart(
+    app: tauri::AppHandle,
+    state: State<'_, Arc<AppState>>,
+) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
-    app.autolaunch().disable().map_err(|e| e.to_string())
+    app.autolaunch().disable().map_err(|e| e.to_string())?;
+    let repo = SettingsRepository::new(&state.db);
+    let _ = repo.set("autostart_enabled", "false");
+    Ok(())
 }
 
 // ============ 系统主题命令 ============

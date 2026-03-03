@@ -1075,6 +1075,7 @@ async fn show_image_preview(
     image_path: String,
     img_width: f64,
     img_height: f64,
+    offset_y: f64,
     win_x: f64,
     win_y: f64,
     win_width: f64,
@@ -1118,6 +1119,8 @@ async fn show_image_preview(
     }
 
     let _ = window.set_always_on_top(true);
+    // Make transparent areas click-through so screenshot tools won't detect the window
+    let _ = window.set_ignore_cursor_events(true);
 
     let _ = window.emit(
         "image-preview-update",
@@ -1125,6 +1128,7 @@ async fn show_image_preview(
             "imagePath": image_path,
             "width": img_width,
             "height": img_height,
+            "offsetY": offset_y,
             "align": align.as_deref().unwrap_or("left"),
         }),
     );
@@ -1253,6 +1257,31 @@ pub fn run() {
             let state = Arc::new(AppState { db, monitor, active_group_id });
 
             let settings_repo = database::SettingsRepository::new(&state.db);
+
+            // 安装更新后注册表 Run 条目会被清除，根据数据库偏好自动恢复自启动
+            {
+                use tauri_plugin_autostart::ManagerExt;
+                let want_autostart = settings_repo
+                    .get("autostart_enabled")
+                    .ok()
+                    .flatten()
+                    .map(|v| v == "true")
+                    .unwrap_or(false);
+                if want_autostart {
+                    match app.autolaunch().is_enabled() {
+                        Ok(false) => {
+                            if let Err(e) = app.autolaunch().enable() {
+                                tracing::warn!("自启动恢复失败: {}", e);
+                            } else {
+                                tracing::info!("自启动已自动恢复（更新/导入后）");
+                            }
+                        }
+                        Err(e) => tracing::warn!("检查自启动状态失败: {}", e),
+                        _ => {}
+                    }
+                }
+            }
+
             let saved_shortcut = settings_repo
                 .get("global_shortcut")
                 .ok()

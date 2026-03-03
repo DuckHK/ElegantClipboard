@@ -11,17 +11,17 @@
       background: transparent;
       user-select: none;
       -webkit-user-select: none;
-      display: flex;
-      align-items: center;
-      justify-content: flex-start;
-    }
-    body.align-right { justify-content: flex-end; }
-    body.align-center { justify-content: center; }
-    #wrap {
       position: relative;
+    }
+    #wrap {
+      position: absolute;
+      left: 0;
+      top: 0;
       display: inline-block;
-      will-change: width, height;
-      transition: width 0.15s ease-out, height 0.15s ease-out;
+    }
+    body.align-right #wrap {
+      left: auto;
+      right: 0;
     }
     img {
       display: block;
@@ -81,20 +81,24 @@
       const { convertFileSrc } = window.__TAURI__.core;
 
       listen('image-preview-update', (event) => {
-        const { imagePath, width, height, align } = event.payload;
+        const { imagePath, width, height, offsetY, align } = event.payload;
         img.classList.remove('loaded');
         clearBadge();
         document.body.className = align === 'right' ? 'align-right' : '';
+        wrap.style.transition = 'none';
         wrap.style.width = width + 'px';
         wrap.style.height = height + 'px';
+        wrap.style.top = (offsetY || 0) + 'px';
         img.src = convertFileSrc(imagePath);
       });
 
       listen('image-preview-zoom', (event) => {
-        const { width, height, percent, active, align } = event.payload;
+        const { width, height, offsetY, percent, active, align } = event.payload;
         if (align) document.body.className = align === 'right' ? 'align-right' : '';
+        wrap.style.transition = 'width 0.15s ease-out, height 0.15s ease-out, top 0.15s ease-out';
         wrap.style.width = width + 'px';
         wrap.style.height = height + 'px';
+        wrap.style.top = (offsetY || 0) + 'px';
         if (active) showBadge(percent + '%');
       });
 
@@ -102,9 +106,10 @@
         img.classList.remove('loaded');
         img.removeAttribute('src');
         clearBadge();
-        // Reset wrap size to prevent stale dimensions on next show
+        wrap.style.transition = 'none';
         wrap.style.width = '0';
         wrap.style.height = '0';
+        wrap.style.top = '0';
       });
 
       img.addEventListener('load', () => img.classList.add('loaded'));
