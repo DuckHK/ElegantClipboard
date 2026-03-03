@@ -464,17 +464,22 @@ pub async fn clear_all_history(state: State<'_, Arc<AppState>>) -> Result<i64, S
 pub async fn clear_history(
     state: State<'_, Arc<AppState>>,
     group_id: Option<i64>,
+    content_type: Option<String>,
 ) -> Result<i64, String> {
     use tracing::info;
 
     let repo = ClipboardRepository::new(&state.db);
-    let image_paths = repo.get_clearable_image_paths(group_id).unwrap_or_default();
-    let deleted = repo.clear_history(group_id).map_err(|e| e.to_string())?;
+    let image_paths = repo
+        .get_clearable_image_paths(group_id, content_type.as_deref())
+        .unwrap_or_default();
+    let deleted = repo
+        .clear_history(group_id, content_type.as_deref())
+        .map_err(|e| e.to_string())?;
     let deleted_files = crate::clipboard::cleanup_image_files(&image_paths);
 
     info!(
-        "Cleared {} clipboard items and {} image files (group: {:?})",
-        deleted, deleted_files, group_id
+        "Cleared {} clipboard items and {} image files (group: {:?}, content_type: {:?})",
+        deleted, deleted_files, group_id, content_type
     );
     Ok(deleted)
 }
