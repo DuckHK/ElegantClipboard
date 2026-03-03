@@ -352,6 +352,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   const showByteSize = useUISettings((s) => s.showByteSize);
   const showSourceApp = useUISettings((s) => s.showSourceApp);
   const sourceAppDisplay = useUISettings((s) => s.sourceAppDisplay);
+  const showDragAreaIndicator = useUISettings((s) => s.showDragAreaIndicator);
 
   const [justDropped, setJustDropped] = useState(false);
   const [justPasted, setJustPasted] = useState(false);
@@ -373,6 +374,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     attributes,
     listeners,
     setNodeRef,
+    setActivatorNodeRef,
     transform,
     transition,
     isDragging,
@@ -503,7 +505,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   // ---- Card content ----
 
   const cardContent = (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners}>
+    <div ref={setNodeRef} style={style}>
       <Card
         className={cn(
         "group relative cursor-pointer overflow-hidden shadow-none dark:shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.09),0_2px_8px_-1px_rgba(0,0,0,0.5)] hover:shadow-sm dark:hover:shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.12),0_4px_12px_-2px_rgba(0,0,0,0.6)] hover:border-primary/30 ring-1 ring-black/[0.04] dark:ring-white/[0.1]",
@@ -514,6 +516,27 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
         )}
         onClick={handlePaste}
       >
+        {!isDragging && !isDragOverlay && (
+          <button
+            ref={setActivatorNodeRef}
+            {...attributes}
+            {...listeners}
+            type="button"
+            data-drag-handle="true"
+            onClick={(e) => e.stopPropagation()}
+            className={cn(
+              "absolute inset-y-0 left-0 z-10 flex items-center justify-center w-[clamp(40px,14%,72px)] rounded-l-lg cursor-grab active:cursor-grabbing",
+              showDragAreaIndicator
+                ? "border-r border-dashed border-border/50 bg-background/20 text-muted-foreground/80 opacity-35 transition-colors hover:bg-background/35 hover:text-foreground"
+                : "border-r border-transparent bg-transparent text-transparent opacity-0",
+            )}
+            title="拖拽排序"
+            aria-label="拖拽排序"
+            tabIndex={showDragAreaIndicator ? 0 : -1}
+          >
+            <span className="pointer-events-none text-[10px] leading-none tracking-wider">::</span>
+          </button>
+        )}
         <div className="flex">
           {item.content_type === "image" && item.image_path ? (
             <ImageCard

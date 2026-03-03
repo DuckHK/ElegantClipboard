@@ -143,6 +143,7 @@ export function DisplayTab() {
     timeFormat, setTimeFormat,
     toolbarButtons, setToolbarButtons,
     showCategoryFilter, setShowCategoryFilter,
+    showDragAreaIndicator, setShowDragAreaIndicator,
   } = useUISettings();
 
   const sensors = useSensors(
@@ -274,6 +275,19 @@ export function DisplayTab() {
                 </button>
               ))}
             </div>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label className="text-xs">显示拖拽区域</Label>
+              <p className="text-xs text-muted-foreground">
+                在卡片左侧显示拖拽区域提示，不影响拖拽功能
+              </p>
+            </div>
+            <Switch
+              checked={showDragAreaIndicator}
+              onCheckedChange={setShowDragAreaIndicator}
+            />
           </div>
 
           <div className="flex items-center justify-between">

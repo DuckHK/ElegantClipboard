@@ -41,6 +41,7 @@ interface UISettings {
   pasteCloseWindow: boolean;
   pasteMoveToTop: boolean;
   showCategoryFilter: boolean;
+  showDragAreaIndicator: boolean;
   windowEffect: WindowEffect;
   toolbarButtons: ToolbarButton[];
   setCardMaxLines: (lines: number) => void;
@@ -69,6 +70,7 @@ interface UISettings {
   setPasteCloseWindow: (enabled: boolean) => void;
   setPasteMoveToTop: (enabled: boolean) => void;
   setShowCategoryFilter: (enabled: boolean) => void;
+  setShowDragAreaIndicator: (enabled: boolean) => void;
   setWindowEffect: (effect: WindowEffect) => void;
   setToolbarButtons: (buttons: ToolbarButton[]) => void;
 }
@@ -110,6 +112,7 @@ export const useUISettings = create<UISettings>()(
       pasteCloseWindow: true,
       pasteMoveToTop: false,
       showCategoryFilter: true,
+      showDragAreaIndicator: true,
       windowEffect: "none" as WindowEffect,
       toolbarButtons: ["clear", "pin", "settings"] as ToolbarButton[],
       setCardMaxLines: (lines) => {
@@ -216,6 +219,10 @@ export const useUISettings = create<UISettings>()(
       setShowCategoryFilter: (enabled) => {
         set({ showCategoryFilter: enabled });
         broadcastChange({ showCategoryFilter: enabled });
+      },
+      setShowDragAreaIndicator: (enabled) => {
+        set({ showDragAreaIndicator: enabled });
+        broadcastChange({ showDragAreaIndicator: enabled });
       },
       setWindowEffect: (effect) => {
         set({ windowEffect: effect });
