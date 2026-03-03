@@ -79,9 +79,14 @@ const BASE_PREVIEW_W = 600;
 const BASE_PREVIEW_H = 500;
 
 /** Get the fixed window rect in physical pixels: fills the available space beside the main window on its current monitor */
-async function getPreviewWindowRect(position: "auto" | "left" | "right") {
+async function getPreviewWindowRect(
+  position: "auto" | "left" | "right",
+  cardElement?: HTMLElement | null,
+) {
   const winX = window.screenX ?? window.screenLeft ?? 0;
+  const winY = window.screenY ?? window.screenTop ?? 0;
   const mainW = window.innerWidth || 380;
+  const mainH = window.innerHeight || 600;
 
   // Get the monitor the main window is on (handles multi-monitor correctly)
   const monitor = await currentMonitor();
@@ -94,8 +99,20 @@ async function getPreviewWindowRect(position: "auto" | "left" | "right") {
   // Convert CSS pixels to physical for consistent multi-DPI positioning
   const physWinX = Math.round(winX * scale);
   const physMainW = Math.round(mainW * scale);
+  const physMainH = Math.round(mainH * scale);
   const physGap = Math.round(PREVIEW_GAP * scale);
   const physMinW = Math.round(200 * scale);
+
+  // Center preview window on the hovered card, clamped to monitor bounds
+  let cardCenterPhysY = Math.round((winY + mainH / 2) * scale);
+  if (cardElement) {
+    const rect = cardElement.getBoundingClientRect();
+    cardCenterPhysY = Math.round((winY + rect.top + rect.height / 2) * scale);
+  }
+  const previewY = Math.max(monY, Math.min(
+    cardCenterPhysY - Math.round(physMainH / 2),
+    monY + monH - physMainH,
+  ));
 
   const leftSpace = physWinX - monX - physGap;
   const rightSpace = monX + monW - (physWinX + physMainW) - physGap;
@@ -110,18 +127,18 @@ async function getPreviewWindowRect(position: "auto" | "left" | "right") {
   if (useLeft) {
     return {
       x: monX,
-      y: monY,
+      y: previewY,
       w: Math.max(physMinW, leftSpace),
-      h: monH,
+      h: physMainH,
       scale,
       side: "left" as const,
     };
   }
   return {
     x: physWinX + physMainW + physGap,
-    y: monY,
+    y: previewY,
     w: Math.max(physMinW, rightSpace),
-    h: monH,
+    h: physMainH,
     scale,
     side: "right" as const,
   };
@@ -212,7 +229,7 @@ const ImagePreview = memo(function ImagePreview({
   // Show preview: open fixed-size window, send image + initial CSS size
   const showPreview = useCallback(async () => {
     if (!containerRef.current || !ps.current.currentPath) return;
-    const rect = await getPreviewWindowRect(previewPosition);
+    const rect = await getPreviewWindowRect(previewPosition, containerRef.current);
     const { imgNatural } = ps.current;
     // calcImageSize needs logical max dimensions for CSS output
     const { width, height } = calcImageSize(
@@ -262,7 +279,7 @@ const ImagePreview = memo(function ImagePreview({
       const step = previewZoomStep / 100;
       const delta = e.deltaY > 0 ? -step : step;
 
-      getPreviewWindowRect(previewPosition)
+      getPreviewWindowRect(previewPosition, containerRef.current)
         .then((rect) => {
           const maxW = rect.w / rect.scale;
           const maxH = rect.h / rect.scale;
