@@ -102,7 +102,7 @@ export const useUISettings = create<UISettings>()(
       imageMaxHeight: 512,
       colorTheme: "system" as ColorTheme,
       sharpCorners: false,
-      autoResetState: true,
+      autoResetState: false,
       keyboardNavigation: false,
       searchAutoFocus: false,
       searchAutoClear: true,
