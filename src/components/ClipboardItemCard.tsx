@@ -907,7 +907,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
                 <div className="absolute inset-y-1 left-0 border-l border-dashed border-border/50" />
                 <div className="absolute inset-y-1 right-0 border-r border-dashed border-border/50" />
                 <div className="rounded border border-dashed border-border/60 bg-background/80 px-2 py-1 text-center">
-                  <div className="text-[10px] leading-none text-muted-foreground">中间粘贴、预览触发区域</div>
+                  <div className="text-[10px] leading-none text-muted-foreground">粘贴、预览触发区域</div>
                   <div className="mt-0.5 text-[10px] leading-none text-muted-foreground/90">点击卡片可粘贴</div>
                 </div>
               </div>
