@@ -488,7 +488,7 @@ fn handle_click_outside() {
             // disable_mouse_monitoring 会向本线程投递 MSG_UNINSTALL_KB_HOOK，
             // 该消息将在当前钩子回调返回后的下一次消息循环中处理
             disable_mouse_monitoring();
-            crate::commands::hide_image_preview_window(window.app_handle());
+            crate::commands::hide_preview_windows(window.app_handle());
             let _ = window.emit("window-hidden", ());
         }
     }

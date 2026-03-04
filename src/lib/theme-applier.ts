@@ -12,7 +12,7 @@
  * (important for Settings window to delay show() until ready).
  */
 import { invoke } from "@tauri-apps/api/core";
-import { listen } from "@tauri-apps/api/event";
+import { emitTo, listen } from "@tauri-apps/api/event";
 import { useUISettings } from "@/stores/ui-settings";
 
 const THEME_CLASSES = ["theme-emerald", "theme-cyan", "theme-system"];
@@ -98,6 +98,9 @@ export function initTheme(): Promise<void> {
     const isDark =
       darkMode === "dark" ? true : darkMode === "light" ? false : mq.matches;
     document.documentElement.classList.toggle("dark", isDark);
+    emitTo("text-preview", "text-preview-theme", {
+      theme: isDark ? "dark" : "light",
+    }).catch(() => {});
   }
 
   applyDarkMode();

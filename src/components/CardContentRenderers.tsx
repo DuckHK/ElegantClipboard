@@ -98,7 +98,7 @@ interface PreviewBounds {
 }
 
 /** Get the available space bounds beside the main window for positioning the preview */
-async function getPreviewBounds(
+export async function getPreviewBounds(
   position: "auto" | "left" | "right",
   cardElement?: HTMLElement | null,
 ): Promise<PreviewBounds> {

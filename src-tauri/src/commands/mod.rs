@@ -33,7 +33,7 @@ pub(crate) fn hide_main_window_if_not_pinned(app: &tauri::AppHandle) {
             crate::input_monitor::disable_mouse_monitoring();
             let _ = window.emit("window-hidden", ());
         }
-        hide_image_preview_window(app);
+        hide_preview_windows(app);
 
         // 多屏/高 DPI 下隐藏窗口后系统可能不自动还原前台窗口，导致 Ctrl+V 无接收者。
         // 仅在目标窗口不是当前前台窗口时才调用 SetForegroundWindow，
@@ -71,6 +71,22 @@ pub(crate) fn hide_image_preview_window<R: tauri::Runtime>(app: &tauri::AppHandl
         let _ = preview.hide();
         let _ = preview.emit("image-preview-clear", ());
     }
+}
+
+/// 隐藏文本预览窗口（若存在）。
+pub(crate) fn hide_text_preview_window<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    use tauri::{Emitter, Manager};
+
+    if let Some(preview) = app.get_webview_window("text-preview") {
+        let _ = preview.hide();
+        let _ = preview.emit("text-preview-clear", ());
+    }
+}
+
+/// 隐藏所有悬浮预览窗口（图片 / 文本）。
+pub(crate) fn hide_preview_windows<R: tauri::Runtime>(app: &tauri::AppHandle<R>) {
+    hide_image_preview_window(app);
+    hide_text_preview_window(app);
 }
 
 /// 延迟恢复监控的发送端（全局单线程处理，避免每次粘贴都 spawn 新线程）

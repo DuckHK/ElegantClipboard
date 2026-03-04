@@ -249,7 +249,7 @@ async fn hide_window(window: tauri::WebviewWindow) {
     let _ = window.hide();
     keyboard_hook::set_window_state(keyboard_hook::WindowState::Hidden);
     input_monitor::disable_mouse_monitoring();
-    commands::hide_image_preview_window(window.app_handle());
+    commands::hide_preview_windows(window.app_handle());
     let _ = window.emit("window-hidden", ());
 }
 
@@ -288,7 +288,7 @@ async fn close_window(window: tauri::WebviewWindow) {
     let _ = window.hide();
     keyboard_hook::set_window_state(keyboard_hook::WindowState::Hidden);
     input_monitor::disable_mouse_monitoring();
-    commands::hide_image_preview_window(window.app_handle());
+    commands::hide_preview_windows(window.app_handle());
     let _ = window.emit("window-hidden", ());
 }
 
@@ -657,7 +657,7 @@ fn toggle_window_visibility(app: &tauri::AppHandle) {
             let _ = window.hide();
             keyboard_hook::set_window_state(keyboard_hook::WindowState::Hidden);
             input_monitor::disable_mouse_monitoring();
-            commands::hide_image_preview_window(app);
+            commands::hide_preview_windows(app);
             let _ = window.emit("window-hidden", ());
         } else {
             let follow_cursor = app
@@ -1132,6 +1132,79 @@ async fn hide_image_preview(app: tauri::AppHandle) {
 }
 
 #[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn show_text_preview(
+    app: tauri::AppHandle,
+    text: String,
+    win_x: f64,
+    win_y: f64,
+    win_width: f64,
+    win_height: f64,
+    align: Option<String>,
+    theme: Option<String>,
+) -> Result<(), String> {
+    let mut newly_created = false;
+    let window = if let Some(w) = app.get_webview_window("text-preview") {
+        w
+    } else {
+        newly_created = true;
+        tauri::WebviewWindowBuilder::new(
+            &app,
+            "text-preview",
+            tauri::WebviewUrl::App("/text-preview.html".into()),
+        )
+        .title("")
+        .decorations(false)
+        .transparent(true)
+        .shadow(false)
+        .resizable(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .focused(false)
+        .visible(false)
+        .build()
+        .map_err(|e| format!("创建文本预览窗口失败: {}", e))?
+    };
+
+    let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
+        width: win_width as u32,
+        height: win_height as u32,
+    }));
+    let _ = window.set_position(tauri::Position::Physical(tauri::PhysicalPosition {
+        x: win_x as i32,
+        y: win_y as i32,
+    }));
+
+    if newly_created {
+        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
+    }
+
+    let _ = window.set_always_on_top(true);
+    // Keep text preview click-through; scrolling is driven from main window with Ctrl+Wheel.
+    let _ = window.set_ignore_cursor_events(true);
+
+    let _ = window.emit(
+        "text-preview-update",
+        serde_json::json!({
+            "text": text,
+            "align": align.as_deref().unwrap_or("left"),
+            "theme": theme.as_deref().unwrap_or("light"),
+        }),
+    );
+
+    let _ = window.show();
+    Ok(())
+}
+
+#[tauri::command]
+async fn hide_text_preview(app: tauri::AppHandle) {
+    if let Some(window) = app.get_webview_window("text-preview") {
+        let _ = window.hide();
+        let _ = window.emit("text-preview-clear", ());
+    }
+}
+
+#[tauri::command]
 async fn open_text_editor_window(app: tauri::AppHandle, id: i64) -> Result<(), String> {
     let label = format!("text-editor-{}", id);
 
@@ -1409,6 +1482,8 @@ pub fn run() {
             open_settings_window,
             show_image_preview,
             hide_image_preview,
+            show_text_preview,
+            hide_text_preview,
             open_text_editor_window,
             set_window_pinned,
             is_window_pinned,

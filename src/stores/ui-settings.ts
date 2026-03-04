@@ -21,6 +21,7 @@ interface UISettings {
   showSourceApp: boolean;
   sourceAppDisplay: "both" | "name" | "icon";
   imagePreviewEnabled: boolean;
+  textPreviewEnabled: boolean;
   previewUnboundedMode: boolean;
   previewZoomStep: number;
   previewPosition: "auto" | "left" | "right";
@@ -52,6 +53,7 @@ interface UISettings {
   setShowSourceApp: (show: boolean) => void;
   setSourceAppDisplay: (mode: "both" | "name" | "icon") => void;
   setImagePreviewEnabled: (enabled: boolean) => void;
+  setTextPreviewEnabled: (enabled: boolean) => void;
   setPreviewUnboundedMode: (enabled: boolean) => void;
   setPreviewZoomStep: (step: number) => void;
   setPreviewPosition: (pos: "auto" | "left" | "right") => void;
@@ -95,6 +97,7 @@ export const useUISettings = create<UISettings>()(
       showSourceApp: true,
       sourceAppDisplay: "both" as "both" | "name" | "icon",
       imagePreviewEnabled: false,
+      textPreviewEnabled: false,
       previewUnboundedMode: false,
       previewZoomStep: 15,
       previewPosition: "auto" as "auto" | "left" | "right",
@@ -109,7 +112,7 @@ export const useUISettings = create<UISettings>()(
       darkMode: "auto" as DarkMode,
       cardDensity: "standard" as CardDensity,
       timeFormat: "absolute" as TimeFormat,
-      hoverPreviewDelay: 300,
+      hoverPreviewDelay: 500,
       copySound: false,
       pasteSound: false,
       pasteCloseWindow: true,
@@ -145,6 +148,10 @@ export const useUISettings = create<UISettings>()(
       setImagePreviewEnabled: (enabled) => {
         set({ imagePreviewEnabled: enabled });
         broadcastChange({ imagePreviewEnabled: enabled });
+      },
+      setTextPreviewEnabled: (enabled) => {
+        set({ textPreviewEnabled: enabled });
+        broadcastChange({ textPreviewEnabled: enabled });
       },
       setPreviewUnboundedMode: (enabled) => {
         set({ previewUnboundedMode: enabled });
