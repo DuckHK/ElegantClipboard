@@ -19,6 +19,7 @@
       --panel-shadow: 0 1px 5px rgba(15, 23, 42, 0.08);
       --content-color: rgba(15, 23, 42, 0.92);
       --scrollbar-thumb: rgba(100, 116, 139, 0.24);
+      --panel-radius: 8px;
     }
     body[data-theme="dark"] {
       --panel-border: rgba(148, 163, 184, 0.26);
@@ -26,6 +27,10 @@
       --panel-shadow: 0 1px 6px rgba(2, 6, 23, 0.24);
       --content-color: rgba(241, 245, 249, 0.94);
       --scrollbar-thumb: rgba(148, 163, 184, 0.3);
+      --panel-radius: 8px;
+    }
+    body[data-sharp-corners="true"] {
+      --panel-radius: 0px;
     }
     #wrap {
       position: absolute;
@@ -38,7 +43,7 @@
     #panel {
       width: 100%;
       height: 100%;
-      border-radius: 10px;
+      border-radius: var(--panel-radius);
       border: 1px solid var(--panel-border);
       background: var(--panel-bg);
       backdrop-filter: blur(6px) saturate(110%);
@@ -88,7 +93,11 @@
     function setTheme(theme) {
       document.body.dataset.theme = theme === 'dark' ? 'dark' : 'light';
     }
+    function setSharpCorners(enabled) {
+      document.body.dataset.sharpCorners = enabled ? 'true' : 'false';
+    }
     setTheme(window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    setSharpCorners(false);
 
     function clearPreview() {
       panel.classList.remove('visible');
@@ -100,9 +109,10 @@
       const { listen } = window.__TAURI__.event;
 
       listen('text-preview-update', (event) => {
-        const { text, align, theme } = event.payload || {};
+        const { text, align, theme, sharpCorners } = event.payload || {};
         setTheme(theme);
-        document.body.className = align === 'right' ? 'align-right' : 'align-left';
+        setSharpCorners(Boolean(sharpCorners));
+        document.body.dataset.align = align === 'right' ? 'right' : 'left';
         content.textContent = typeof text === 'string' ? text : '';
         panel.classList.add('visible');
       });

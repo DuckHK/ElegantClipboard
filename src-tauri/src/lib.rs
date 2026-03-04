@@ -41,6 +41,8 @@ static ACTIVE_QUICK_PASTE_SLOTS: std::sync::LazyLock<parking_lot::Mutex<HashSet<
     std::sync::LazyLock::new(|| parking_lot::Mutex::new(HashSet::new()));
 /// simulate_paste 释放修饰键时可能导致 OS 重新触发快捷键，用此标志拦截假触发
 static PASTE_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// Monotonic sequence for text-preview updates; used to cancel stale delayed retries.
+static TEXT_PREVIEW_UPDATE_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn default_quick_paste_shortcuts() -> Vec<String> {
     (1..=9).map(|slot| format!("Alt+{}", slot)).collect()
@@ -1142,7 +1144,9 @@ async fn show_text_preview(
     win_height: f64,
     align: Option<String>,
     theme: Option<String>,
+    sharp_corners: Option<bool>,
 ) -> Result<(), String> {
+    let seq = TEXT_PREVIEW_UPDATE_SEQ.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
     let mut newly_created = false;
     let window = if let Some(w) = app.get_webview_window("text-preview") {
         w
@@ -1175,29 +1179,38 @@ async fn show_text_preview(
         y: win_y as i32,
     }));
 
-    if newly_created {
-        tokio::time::sleep(std::time::Duration::from_millis(120)).await;
-    }
-
     let _ = window.set_always_on_top(true);
     // Keep text preview click-through; scrolling is driven from main window with Ctrl+Wheel.
     let _ = window.set_ignore_cursor_events(true);
 
-    let _ = window.emit(
-        "text-preview-update",
-        serde_json::json!({
-            "text": text,
-            "align": align.as_deref().unwrap_or("left"),
-            "theme": theme.as_deref().unwrap_or("light"),
-        }),
-    );
-
+    let update_payload = serde_json::json!({
+        "text": text,
+        "align": align.as_deref().unwrap_or("left"),
+        "theme": theme.as_deref().unwrap_or("light"),
+        "sharpCorners": sharp_corners.unwrap_or(false),
+    });
+    let _ = window.emit("text-preview-update", update_payload.clone());
     let _ = window.show();
+
+    if newly_created {
+        let window_clone = window.clone();
+        tauri::async_runtime::spawn(async move {
+            for delay_ms in [120_u64, 260, 420, 680] {
+                tokio::time::sleep(std::time::Duration::from_millis(delay_ms)).await;
+                if TEXT_PREVIEW_UPDATE_SEQ.load(std::sync::atomic::Ordering::Acquire) != seq {
+                    return;
+                }
+                let _ = window_clone.emit("text-preview-update", update_payload.clone());
+            }
+        });
+    }
+
     Ok(())
 }
 
 #[tauri::command]
 async fn hide_text_preview(app: tauri::AppHandle) {
+    TEXT_PREVIEW_UPDATE_SEQ.fetch_add(1, std::sync::atomic::Ordering::AcqRel);
     if let Some(window) = app.get_webview_window("text-preview") {
         let _ = window.hide();
         let _ = window.emit("text-preview-clear", ());

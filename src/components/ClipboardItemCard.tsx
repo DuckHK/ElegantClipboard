@@ -89,10 +89,17 @@ interface ClipboardItemCardProps {
 
 const clipboardActions = () => useClipboardStore.getState();
 const fileValidityCache = new Map<string, boolean>();
+const textPreviewContentCache = new Map<number, string>();
+const TEXT_PREVIEW_CACHE_MAX_ITEMS = 180;
 const TEXT_PREVIEW_MIN_W = 360;
 const TEXT_PREVIEW_MAX_W = 900;
 const TEXT_PREVIEW_MIN_H = 130;
 const TEXT_PREVIEW_MAX_H = 560;
+const TEXT_PREVIEW_CHAR_WIDTH = 7.6;
+const TEXT_PREVIEW_HORIZONTAL_PADDING = 44;
+const TEXT_PREVIEW_MIN_CHARS_PER_LINE = 24;
+const TEXT_PREVIEW_SAMPLE_MAX_CHARS = 24_000;
+const TEXT_PREVIEW_SAMPLE_MAX_LINES = 900;
 
 interface ClipboardItemDetail {
   id: number;
@@ -100,12 +107,100 @@ interface ClipboardItemDetail {
   preview: string | null;
 }
 
-function visualColumns(input: string): number {
-  let total = 0;
-  for (const ch of input) {
-    total += /[\u2E80-\uA4CF\uAC00-\uD7A3\uF900-\uFAFF\uFE10-\uFE6F\uFF00-\uFFEF]/.test(ch) ? 2 : 1;
+function isWideCodePoint(codePoint: number): boolean {
+  return (
+    (codePoint >= 0x2E80 && codePoint <= 0xA4CF)
+    || (codePoint >= 0xAC00 && codePoint <= 0xD7A3)
+    || (codePoint >= 0xF900 && codePoint <= 0xFAFF)
+    || (codePoint >= 0xFE10 && codePoint <= 0xFE6F)
+    || (codePoint >= 0xFF00 && codePoint <= 0xFFEF)
+  );
+}
+
+interface TextPreviewSample {
+  longestVisualCols: number;
+  lineColumns: number[];
+  processedCodeUnits: number;
+  truncated: boolean;
+}
+
+function sampleTextPreview(text: string): TextPreviewSample {
+  const lineColumns: number[] = [];
+  let longestVisualCols = 1;
+  let currentLineCols = 0;
+  let processedCodeUnits = 0;
+  let lineCount = 1;
+  let truncated = false;
+  let endsWithLineBreak = false;
+
+  const finalizeLine = () => {
+    const cols = Math.max(1, currentLineCols);
+    lineColumns.push(cols);
+    longestVisualCols = Math.max(longestVisualCols, cols);
+    currentLineCols = 0;
+  };
+
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    processedCodeUnits += 1;
+
+    if (code === 0x0D || code === 0x0A) {
+      if (code === 0x0D && i + 1 < text.length && text.charCodeAt(i + 1) === 0x0A) {
+        i += 1;
+        processedCodeUnits += 1;
+      }
+      finalizeLine();
+      lineCount += 1;
+      endsWithLineBreak = true;
+    } else {
+      endsWithLineBreak = false;
+      const codePoint = text.codePointAt(i);
+      if (codePoint !== undefined) {
+        currentLineCols += isWideCodePoint(codePoint) ? 2 : 1;
+        if (codePoint > 0xFFFF) {
+          i += 1;
+          processedCodeUnits += 1;
+        }
+      }
+    }
+
+    if (processedCodeUnits >= TEXT_PREVIEW_SAMPLE_MAX_CHARS || lineCount > TEXT_PREVIEW_SAMPLE_MAX_LINES) {
+      truncated = true;
+      break;
+    }
   }
-  return total;
+
+  if (currentLineCols > 0 || lineColumns.length === 0 || endsWithLineBreak) {
+    finalizeLine();
+  }
+
+  return {
+    longestVisualCols,
+    lineColumns,
+    processedCodeUnits,
+    truncated,
+  };
+}
+
+function getCachedTextPreviewContent(id: number): string | undefined {
+  const cached = textPreviewContentCache.get(id);
+  if (cached === undefined) {
+    return undefined;
+  }
+  textPreviewContentCache.delete(id);
+  textPreviewContentCache.set(id, cached);
+  return cached;
+}
+
+function setCachedTextPreviewContent(id: number, text: string): void {
+  textPreviewContentCache.set(id, text);
+  if (textPreviewContentCache.size <= TEXT_PREVIEW_CACHE_MAX_ITEMS) {
+    return;
+  }
+  const oldestKey = textPreviewContentCache.keys().next().value;
+  if (oldestKey !== undefined) {
+    textPreviewContentCache.delete(oldestKey);
+  }
 }
 
 // ============ File Details Dialog ============
@@ -377,6 +472,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   const textPreviewEnabled = useUISettings((s) => s.textPreviewEnabled);
   const hoverPreviewDelay = useUISettings((s) => s.hoverPreviewDelay);
   const previewPosition = useUISettings((s) => s.previewPosition);
+  const sharpCorners = useUISettings((s) => s.sharpCorners);
 
   const [justDropped, setJustDropped] = useState(false);
   const [justPasted, setJustPasted] = useState(false);
@@ -391,7 +487,8 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   const textPreviewAnchorRef = useRef<HTMLDivElement | null>(null);
   const textPreviewHoveringRef = useRef(false);
   const textPreviewReqIdRef = useRef(0);
-  const textPreviewCacheRef = useRef<Map<number, string>>(new Map());
+  const textScrollEmitRafRef = useRef<number | null>(null);
+  const textScrollPendingDeltaRef = useRef(0);
 
   const filePaths = useMemo(
     () => item.content_type === "files" ? parseFilePaths(item.file_paths) : [],
@@ -509,6 +606,11 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   const hideTextPreview = useCallback(() => {
     clearTextPreviewTimer();
     textPreviewHoveringRef.current = false;
+    if (textScrollEmitRafRef.current !== null) {
+      cancelAnimationFrame(textScrollEmitRafRef.current);
+      textScrollEmitRafRef.current = null;
+    }
+    textScrollPendingDeltaRef.current = 0;
     if (textPreviewVisibleRef.current) {
       textPreviewVisibleRef.current = false;
       invoke("hide_text_preview").catch(() => {});
@@ -519,13 +621,13 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     const inlineText = item.text_content || item.preview || "";
     if (!isTextLikeContent) return "";
     if (item.text_content) return item.text_content;
-    const cached = textPreviewCacheRef.current.get(item.id);
+    const cached = getCachedTextPreviewContent(item.id);
     if (cached) return cached;
     try {
       const detail = await invoke<ClipboardItemDetail | null>("get_clipboard_item", { id: item.id });
       const resolved = detail?.text_content || detail?.preview || inlineText;
       if (resolved) {
-        textPreviewCacheRef.current.set(item.id, resolved);
+        setCachedTextPreviewContent(item.id, resolved);
       }
       return resolved;
     } catch {
@@ -547,18 +649,25 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     if (!textPreviewHoveringRef.current || reqId !== textPreviewReqIdRef.current) return;
     const availableCssW = Math.max(260, Math.floor(bounds.maxW / bounds.scale));
     const availableCssH = Math.max(140, Math.floor(bounds.maxH / bounds.scale));
-    const lines = textContent.split(/\r?\n/);
-    const longestVisualCols = lines.reduce((max, line) => Math.max(max, visualColumns(line)), 0);
-    const desiredWidth = longestVisualCols * 7.6 + 44;
+    const sampled = sampleTextPreview(textContent);
+    const desiredWidth = sampled.longestVisualCols * TEXT_PREVIEW_CHAR_WIDTH + TEXT_PREVIEW_HORIZONTAL_PADDING;
     const windowCssW = Math.min(
       availableCssW,
       Math.min(TEXT_PREVIEW_MAX_W, Math.max(TEXT_PREVIEW_MIN_W, desiredWidth)),
     );
-    const charsPerLine = Math.max(24, Math.floor((windowCssW - 30) / 7.6));
-    const estimatedLines = lines.reduce((sum, line) => {
-      const length = Math.max(1, visualColumns(line));
-      return sum + Math.max(1, Math.ceil(length / charsPerLine));
+    const charsPerLine = Math.max(
+      TEXT_PREVIEW_MIN_CHARS_PER_LINE,
+      Math.floor((windowCssW - 30) / TEXT_PREVIEW_CHAR_WIDTH),
+    );
+    const sampledWrappedLines = sampled.lineColumns.reduce((sum, lineCols) => {
+      return sum + Math.max(1, Math.ceil(lineCols / charsPerLine));
     }, 0);
+    let estimatedLines = sampledWrappedLines;
+    if (sampled.truncated && sampled.processedCodeUnits < textContent.length) {
+      const remaining = textContent.length - sampled.processedCodeUnits;
+      const linesPerCodeUnit = sampledWrappedLines / Math.max(1, sampled.processedCodeUnits);
+      estimatedLines += Math.max(1, Math.ceil(remaining * linesPerCodeUnit));
+    }
     const estimatedCssH = Math.min(
       TEXT_PREVIEW_MAX_H,
       Math.max(TEXT_PREVIEW_MIN_H, estimatedLines * 21 + 40),
@@ -583,13 +692,14 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
         winHeight: winH,
         align,
         theme,
+        sharpCorners,
       });
       textPreviewVisibleRef.current = true;
     } catch (error) {
       textPreviewVisibleRef.current = false;
       logError("Failed to show text preview:", error);
     }
-  }, [textPreviewEnabled, isTextLikeContent, previewPosition, resolveTextPreviewContent]);
+  }, [textPreviewEnabled, isTextLikeContent, previewPosition, resolveTextPreviewContent, sharpCorners]);
 
   const handleTextMouseEnter = useCallback(() => {
     if (!textPreviewEnabled || !isTextLikeContent) return;
@@ -609,7 +719,17 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     if (!e.ctrlKey || !textPreviewVisibleRef.current) return;
     e.preventDefault();
     e.stopPropagation();
-    emitTo("text-preview", "text-preview-scroll", { deltaY: e.deltaY }).catch(() => {});
+    textScrollPendingDeltaRef.current += e.deltaY;
+
+    if (textScrollEmitRafRef.current === null) {
+      textScrollEmitRafRef.current = requestAnimationFrame(() => {
+        textScrollEmitRafRef.current = null;
+        const deltaY = textScrollPendingDeltaRef.current;
+        textScrollPendingDeltaRef.current = 0;
+        if (deltaY === 0 || !textPreviewVisibleRef.current) return;
+        emitTo("text-preview", "text-preview-scroll", { deltaY }).catch(() => {});
+      });
+    }
   }, []);
 
   useEffect(() => {
@@ -743,8 +863,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
                   : "border-r border-transparent bg-transparent text-transparent opacity-0",
               )}
               style={{ width: dragHandleWidth }}
-              title="左侧拖拽区域"
-              aria-label="左侧拖拽区域"
+              aria-label="拖拽区域"
               tabIndex={showDragAreaIndicator ? 0 : -1}
             >
               <span
@@ -768,8 +887,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
                   : "border-l border-transparent bg-transparent text-transparent opacity-0",
               )}
               style={{ width: dragHandleWidth }}
-              title="右侧拖拽区域"
-              aria-label="右侧拖拽区域"
+              aria-label="拖拽区域"
               tabIndex={showDragAreaIndicator ? 0 : -1}
             >
               <span
@@ -789,7 +907,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
                 <div className="absolute inset-y-1 left-0 border-l border-dashed border-border/50" />
                 <div className="absolute inset-y-1 right-0 border-r border-dashed border-border/50" />
                 <div className="rounded border border-dashed border-border/60 bg-background/80 px-2 py-1 text-center">
-                  <div className="text-[10px] leading-none text-muted-foreground">中间粘贴区域</div>
+                  <div className="text-[10px] leading-none text-muted-foreground">中间粘贴、预览触发区域</div>
                   <div className="mt-0.5 text-[10px] leading-none text-muted-foreground/90">点击卡片可粘贴</div>
                 </div>
               </div>
