@@ -647,6 +647,48 @@ pub fn run() {
                     .show();
             }
 
+            // 启动后 30 秒自动检查更新（可在设置中关闭）
+            {
+                let auto_check = settings_repo
+                    .get("auto_check_update")
+                    .ok()
+                    .flatten()
+                    .map(|v| v != "false")
+                    .unwrap_or(true); // 默认开启
+                if auto_check {
+                    let app_handle = app.handle().clone();
+                    std::thread::spawn(move || {
+                        use tauri::Emitter;
+                        use tauri_plugin_notification::NotificationExt;
+                        std::thread::sleep(std::time::Duration::from_secs(30));
+                        match updater::check_update() {
+                            Ok(info) if info.has_update => {
+                                tracing::info!(
+                                    "Auto update check: new version v{} available",
+                                    info.latest_version
+                                );
+                                let _ = app_handle
+                                    .notification()
+                                    .builder()
+                                    .title("发现新版本")
+                                    .body(format!(
+                                        "v{} → v{}，可在设置中查看详情",
+                                        info.current_version, info.latest_version
+                                    ))
+                                    .show();
+                                let _ = app_handle.emit("auto-update-available", info);
+                            }
+                            Ok(_) => {
+                                tracing::info!("Auto update check: already at latest version");
+                            }
+                            Err(e) => {
+                                tracing::warn!("Auto update check failed: {}", e);
+                            }
+                        }
+                    });
+                }
+            }
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![

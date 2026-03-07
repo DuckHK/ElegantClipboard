@@ -6,10 +6,10 @@ import {
   Search16Regular,
 } from "@fluentui/react-icons";
 import { listen } from "@tauri-apps/api/event";
-import { ScrollToTopButton } from "@/components/ScrollToTopButton";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useShallow } from "zustand/react/shallow";
+import { ScrollToTopButton } from "@/components/ScrollToTopButton";
 import { Separator } from "@/components/ui/separator";
 import { useSortableList } from "@/hooks/useSortableList";
 import { GROUPS } from "@/lib/constants";

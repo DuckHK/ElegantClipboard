@@ -48,10 +48,14 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
   const [logRestartDialogOpen, setLogRestartDialogOpen] = useState(false);
   const [pendingLogToFile, setPendingLogToFile] = useState<boolean | null>(null);
   const [persistWindowSize, setPersistWindowSize] = useState(true);
+  const [autoCheckUpdate, setAutoCheckUpdate] = useState(true);
 
   useEffect(() => {
     invoke<string | null>("get_setting", { key: "persist_window_size" })
       .then((v) => setPersistWindowSize(v !== "false"))
+      .catch(() => {});
+    invoke<string | null>("get_setting", { key: "auto_check_update" })
+      .then((v) => setAutoCheckUpdate(v !== "false"))
       .catch(() => {});
   }, []);
 
@@ -66,6 +70,15 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
       }
     } catch (error) {
       logError("Failed to save persist_window_size:", error);
+    }
+  };
+
+  const toggleAutoCheckUpdate = async (enabled: boolean) => {
+    setAutoCheckUpdate(enabled);
+    try {
+      await invoke("set_setting", { key: "auto_check_update", value: String(enabled) });
+    } catch (error) {
+      logError("Failed to save auto_check_update:", error);
     }
   };
 
@@ -109,6 +122,18 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
                   setPendingAdminLaunch(checked);
                   setAdminRestartDialogOpen(true);
                 }}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-xs">自动检查更新</Label>
+                <p className="text-xs text-muted-foreground">
+                  仅在程序启动时自动检查更新
+                </p>
+              </div>
+              <Switch
+                checked={autoCheckUpdate}
+                onCheckedChange={toggleAutoCheckUpdate}
               />
             </div>
           </div>
