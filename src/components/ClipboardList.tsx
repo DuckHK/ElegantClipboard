@@ -239,6 +239,7 @@ export function ClipboardList() {
   const handleNavKey = useCallback(
     (key: string, shift: boolean) => {
       if (!useUISettings.getState().keyboardNavigation) return;
+      if (useClipboardStore.getState().batchMode) return;
 
       switch (key) {
         case "ArrowLeft": {

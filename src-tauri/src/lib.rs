@@ -747,6 +747,7 @@ pub fn run() {
             commands::clipboard::move_clipboard_item,
             commands::clipboard::bump_item_to_top,
             commands::clipboard::delete_clipboard_item,
+            commands::clipboard::batch_delete_clipboard_items,
             commands::clipboard::clear_history,
             commands::clipboard::clear_all_history,
             commands::clipboard::copy_to_clipboard,

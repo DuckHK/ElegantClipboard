@@ -9,9 +9,9 @@ export type CardDensity = "compact" | "standard" | "spacious";
 export type TimeFormat = "relative" | "absolute";
 export type WindowEffect = "none" | "mica" | "acrylic" | "tabbed";
 export type SoundTiming = "immediate" | "after_success";
-export type ToolbarButton = "clear" | "pin" | "settings";
+export type ToolbarButton = "clear" | "pin" | "batch" | "settings";
 
-export const DEFAULT_TOOLBAR_BUTTONS: ToolbarButton[] = ["clear", "pin", "settings"];
+export const DEFAULT_TOOLBAR_BUTTONS: ToolbarButton[] = ["clear", "batch", "pin", "settings"];
 export const MAX_TOOLBAR_BUTTONS = 5;
 
 interface UISettings {
@@ -136,9 +136,9 @@ export const useUISettings = create<UISettings>()(
         pasteMoveToTop: false,
         showCategoryFilter: true,
         showDragAreaIndicator: true,
-        windowAnimation: true,
+        windowAnimation: false,
         windowEffect: "none" as WindowEffect,
-        toolbarButtons: ["clear", "pin", "settings"] as ToolbarButton[],
+        toolbarButtons: ["clear", "batch", "pin", "settings"] as ToolbarButton[],
 
         setCardMaxLines: makeSetter("cardMaxLines"),
         setShowTime: makeSetter("showTime"),

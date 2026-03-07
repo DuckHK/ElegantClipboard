@@ -13,6 +13,7 @@ import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { HighlightText } from "@/components/HighlightText";
 import { getFileNameFromPath, isImageFile } from "@/lib/format";
 import { logError } from "@/lib/logger";
+import { useClipboardStore } from "@/stores/clipboard";
 import { cn } from "@/lib/utils";
 import { useUISettings } from "@/stores/ui-settings";
 
@@ -337,12 +338,14 @@ const ImagePreview = memo(function ImagePreview({
 
   const hoverPreviewDelay = useUISettings((s) => s.hoverPreviewDelay);
 
+  const batchMode = useClipboardStore((s) => s.batchMode);
+
   const handleMouseEnter = useCallback(() => {
-    if (!imagePath || !imagePreviewEnabled) return;
+    if (!imagePath || !imagePreviewEnabled || batchMode) return;
     ps.current.currentPath = imagePath;
     clearTimer();
     timerRef.current = setTimeout(showPreview, hoverPreviewDelay);
-  }, [imagePath, imagePreviewEnabled, clearTimer, showPreview, hoverPreviewDelay]);
+  }, [imagePath, imagePreviewEnabled, batchMode, clearTimer, showPreview, hoverPreviewDelay]);
 
   // Ctrl+Scroll zoom. Coalesce cross-window events to one emit per animation frame.
   const handleWheel = useCallback(

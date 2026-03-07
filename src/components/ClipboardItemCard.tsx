@@ -9,6 +9,8 @@ import {
   ClipboardPaste16Regular,
   ArrowDownload16Regular,
   Edit16Regular,
+  CheckmarkCircle16Filled,
+  Circle16Regular,
 } from "@fluentui/react-icons";
 import { invoke } from "@tauri-apps/api/core";
 import { emitTo } from "@tauri-apps/api/event";
@@ -118,6 +120,9 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   const isActiveIndex = useClipboardStore(
     (s) => index !== undefined && index >= 0 && s.activeIndex === index,
   );
+  const batchMode = useClipboardStore((s) => s.batchMode);
+  const isSelected = useClipboardStore((s) => s.selectedIds.has(item.id));
+  const toggleSelect = useClipboardStore((s) => s.toggleSelect);
   const keyboardNavEnabled = useUISettings((s) => s.keyboardNavigation);
   const isActive = isActiveIndex && keyboardNavEnabled;
   const {
@@ -219,7 +224,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     isDragging,
   } = useSortable({
     id: sortId || `item-${item.id}`,
-    disabled: isDragOverlay,
+    disabled: isDragOverlay || batchMode,
     // Keep reorder motion crisp and avoid bounce-like release feel.
     transition: {
       duration: 120,
@@ -356,11 +361,11 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   }, [textPreviewEnabled, isTextLikeContent, previewPosition, resolveTextPreviewContent, sharpCorners]);
 
   const handleTextMouseEnter = useCallback(() => {
-    if (!textPreviewEnabled || !isTextLikeContent) return;
+    if (!textPreviewEnabled || !isTextLikeContent || batchMode) return;
     textPreviewHoveringRef.current = true;
     clearTextPreviewTimer();
     textPreviewTimerRef.current = setTimeout(showTextPreview, hoverPreviewDelay);
-  }, [textPreviewEnabled, isTextLikeContent, clearTextPreviewTimer, showTextPreview, hoverPreviewDelay]);
+  }, [textPreviewEnabled, isTextLikeContent, batchMode, clearTextPreviewTimer, showTextPreview, hoverPreviewDelay]);
 
   const handleTextMouseLeave = useCallback(() => {
     textPreviewHoveringRef.current = false;
@@ -404,7 +409,11 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     };
   }, [hideTextPreview]);
 
-  const handlePaste = () => {
+  const handlePaste = (e: React.MouseEvent) => {
+    if (batchMode) {
+      toggleSelect(item.id, index ?? 0, e.shiftKey);
+      return;
+    }
     if (!isDragging && !isDragOverlay) {
       hideTextPreview();
       pasteContent(item.id);
@@ -495,13 +504,14 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
         className={cn(
         "group relative cursor-pointer overflow-hidden shadow-none dark:shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.09),0_2px_8px_-1px_rgba(0,0,0,0.5)] hover:shadow-sm dark:hover:shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.12),0_4px_12px_-2px_rgba(0,0,0,0.6)] hover:border-primary/30 ring-1 ring-black/4 dark:ring-white/10",
           isDragOverlay && "shadow-lg border-primary cursor-grabbing",
-          // justDropped animation removed for cleaner drag-drop feel
           justPasted && "animate-paste-flash",
           isActive && "bg-accent shadow-sm",
+          batchMode && isSelected && "bg-primary/5",
+          batchMode && !isSelected && "opacity-90",
         )}
         onClick={handlePaste}
       >
-        {!isDragging && !isDragOverlay && (
+        {!isDragging && !isDragOverlay && !batchMode && (
           <>
             <button
               ref={setActivatorNodeRef}
@@ -569,6 +579,15 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
           </>
         )}
         <div className="flex">
+          <div className={cn(
+            "flex items-center justify-center shrink-0 overflow-hidden border-r transition-all duration-200 ease-out",
+            batchMode ? "w-8 border-border/30" : "w-0 border-transparent"
+          )}>
+            {isSelected
+              ? <CheckmarkCircle16Filled className="w-4.5 h-4.5 text-primary" />
+              : <Circle16Regular className="w-4.5 h-4.5 text-muted-foreground/30" />
+            }
+          </div>
           {item.content_type === "image" && item.image_path ? (
             <ImageCard
               image_path={item.image_path}
@@ -621,7 +640,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
             </div>
           )}
 
-          {!isDragging && !isDragOverlay && (
+          {!isDragging && !isDragOverlay && !batchMode && (
             <ActionToolbar
               item={item}
               onTogglePin={handleTogglePin}
@@ -655,11 +674,11 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
 
   // 上下文菜单配置
   const contextMenuItems: ContextMenuItemConfig[] | null = (() => {
-    if (isDragOverlay) return null;
+    if (isDragOverlay || batchMode) return null;
     // 文本类内容（text/html/rtf）可编辑
     if (item.content_type === "text" || item.content_type === "html" || item.content_type === "rtf") {
       return [
-        { icon: ClipboardPaste16Regular, label: "粘贴", onClick: handlePaste },
+        { icon: ClipboardPaste16Regular, label: "粘贴", onClick: () => pasteContent(item.id) },
         { icon: TextDescription16Regular, label: "粘贴为纯文本", onClick: () => pasteAsPlainText(item.id) },
         { icon: Copy16Regular, label: "复制", onClick: handleCopyCtxMenu },
         { icon: Edit16Regular, label: "编辑", onClick: handleEdit },
@@ -668,7 +687,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     }
     if (item.content_type === "files") {
       return [
-        { icon: ClipboardPaste16Regular, label: "粘贴", onClick: handlePaste },
+        { icon: ClipboardPaste16Regular, label: "粘贴", onClick: () => pasteContent(item.id) },
         { icon: TextDescription16Regular, label: "粘贴为路径", onClick: handlePasteAsPath },
         { icon: FolderOpen16Regular, label: "在资源管理器中显示", onClick: handleShowInExplorer, disabled: filesInvalid },
         { icon: ArrowDownload16Regular, label: "另存为", onClick: handleSaveAs, disabled: filesInvalid },
@@ -678,7 +697,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     }
     if (item.content_type === "image" && item.image_path) {
       return [
-        { icon: ClipboardPaste16Regular, label: "粘贴", onClick: handlePaste },
+        { icon: ClipboardPaste16Regular, label: "粘贴", onClick: () => pasteContent(item.id) },
         { icon: Copy16Regular, label: "复制", onClick: handleCopyCtxMenu },
         { icon: FolderOpen16Regular, label: "在资源管理器中显示", onClick: handleShowImageInExplorer },
         { icon: ArrowDownload16Regular, label: "另存为", onClick: handleSaveAs },

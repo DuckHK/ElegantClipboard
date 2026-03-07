@@ -9,6 +9,7 @@ import {
   LockClosed16Filled,
   Add16Regular,
   ChevronDown16Regular,
+  MultiselectLtr16Regular,
 } from "@fluentui/react-icons";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -69,6 +70,11 @@ function App() {
   const [deleteGroupTarget, setDeleteGroupTarget] = useState<Group | null>(null);
 
   const { searchQuery, selectedGroup, selectedGroupId, setSearchQuery, setSelectedGroup, setSelectedGroupId, fetchItems, clearHistory, refresh, resetView } = useClipboardStore();
+  const batchMode = useClipboardStore((s) => s.batchMode);
+  const selectedIds = useClipboardStore((s) => s.selectedIds);
+  const setBatchMode = useClipboardStore((s) => s.setBatchMode);
+  const batchDelete = useClipboardStore((s) => s.batchDelete);
+  const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false);
   const { groups, fetchGroups, createGroup, renameGroup, deleteGroup } = useGroupStore();
   const autoResetState = useUISettings((s) => s.autoResetState);
   const searchAutoFocus = useUISettings((s) => s.searchAutoFocus);
@@ -265,6 +271,7 @@ function App() {
       setWindowVisible(false);
       dismissOverlays();
       setGroupDropdownOpen(false);
+      setBatchMode(false);
       if (autoResetState) {
         resetView();
       }
@@ -277,12 +284,16 @@ function App() {
   // ESC 键处理：后端钩子 + DOM 监听双通道
   const handleEscape = useCallback(async () => {
     if (dismissOverlays()) return;
+    if (useClipboardStore.getState().batchMode) {
+      setBatchMode(false);
+      return;
+    }
     try {
       await invoke("hide_window");
     } catch (error) {
       logError("Failed to hide window:", error);
     }
-  }, []);
+  }, [setBatchMode]);
 
   // 通道1：后端键盘钩子
   useEffect(() => {
@@ -401,6 +412,24 @@ function App() {
             <TooltipContent>{isPinned ? "解除锁定" : "锁定窗口"}</TooltipContent>
           </Tooltip>
         );
+      case "batch":
+        return (
+          <Tooltip key={id}>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => setBatchMode(!batchMode)}
+                className={`w-7 h-7 flex items-center justify-center rounded transition-colors ${
+                  batchMode
+                    ? "text-primary bg-primary/10"
+                    : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
+                }`}
+              >
+                <MultiselectLtr16Regular className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>{batchMode ? "退出批量选择" : "批量选择"}</TooltipContent>
+          </Tooltip>
+        );
       case "settings":
         return (
           <Tooltip key={id}>
@@ -418,7 +447,7 @@ function App() {
       default:
         return null;
     }
-  }, [isPinned, openSettings, togglePinned]);
+  }, [isPinned, openSettings, togglePinned, batchMode, setBatchMode]);
 
   return (
     <div className={cn("h-screen flex flex-col bg-muted/40 overflow-hidden", windowAnimation && windowVisible === true && "window-enter", windowAnimation && windowVisible === false && "window-hidden")}>
@@ -458,6 +487,31 @@ function App() {
           </div>
         )}
       </div>
+
+      {/* 批量操作栏 */}
+      {batchMode && (
+        <div className="shrink-0 flex items-center justify-between px-3 py-1.5 bg-primary/5 border-b border-primary/20">
+          <span className="text-xs text-muted-foreground">
+            已选择 <span className="font-medium text-foreground">{selectedIds.size}</span> 项
+            <span className="ml-1.5 text-muted-foreground/60">Shift 连选</span>
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setBatchDeleteDialogOpen(true)}
+              disabled={selectedIds.size === 0}
+              className="text-xs px-2 py-1 rounded bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              删除
+            </button>
+            <button
+              onClick={() => setBatchMode(false)}
+              className="text-xs px-2 py-1 rounded hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+            >
+              取消
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 剪贴板列表 */}
       <div className="flex-1 overflow-hidden">
@@ -584,6 +638,32 @@ function App() {
           </div>
         </div>
       )}
+
+      {/* 批量删除确认对话框 */}
+      <Dialog open={batchDeleteDialogOpen} onOpenChange={setBatchDeleteDialogOpen}>
+        <DialogContent showCloseButton={false}>
+          <DialogHeader className="text-left">
+            <DialogTitle>批量删除</DialogTitle>
+            <DialogDescription className="text-left">
+              确定要删除选中的 {selectedIds.size} 条记录吗？此操作不可撤销。
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setBatchDeleteDialogOpen(false)}>
+              取消
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={async () => {
+                setBatchDeleteDialogOpen(false);
+                await batchDelete();
+              }}
+            >
+              删除
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* 清空历史确认对话框 */}
       <Dialog open={clearDialogOpen} onOpenChange={setClearDialogOpen}>
