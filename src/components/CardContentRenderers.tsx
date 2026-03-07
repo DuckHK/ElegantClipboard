@@ -13,8 +13,8 @@ import { currentMonitor, getCurrentWindow } from "@tauri-apps/api/window";
 import { HighlightText } from "@/components/HighlightText";
 import { getFileNameFromPath, isImageFile } from "@/lib/format";
 import { logError } from "@/lib/logger";
-import { useClipboardStore } from "@/stores/clipboard";
 import { cn } from "@/lib/utils";
+import { useClipboardStore } from "@/stores/clipboard";
 import { useUISettings } from "@/stores/ui-settings";
 
 // ============ Card Footer ============
