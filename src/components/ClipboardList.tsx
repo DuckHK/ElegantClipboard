@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useMemo, useState } from "react";
+import { CSS } from "@dnd-kit/utilities";
 import {
   ClipboardMultiple16Regular,
   Filter16Regular,
@@ -9,7 +10,6 @@ import { listen } from "@tauri-apps/api/event";
 import { OverlayScrollbarsComponent } from "overlayscrollbars-react";
 import { Virtuoso, VirtuosoHandle } from "react-virtuoso";
 import { useShallow } from "zustand/react/shallow";
-import { CSS } from "@dnd-kit/utilities";
 import { Separator } from "@/components/ui/separator";
 import { useSortableList } from "@/hooks/useSortableList";
 import { GROUPS } from "@/lib/constants";
