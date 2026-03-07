@@ -4,12 +4,12 @@ use tauri::{
     image::Image,
     menu::{Menu, MenuItem, PredefinedMenuItem},
     tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent},
-    AppHandle, Emitter, Manager, Runtime,
+    AppHandle, Emitter, Manager,
 };
 use tracing::info;
 
 /// 初始化系统托盘图标和菜单
-pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
     let icon_data = include_bytes!("../../icons/icon.png");
     let img = image::load_from_memory(icon_data)?;
     let rgba = img.to_rgba8();
@@ -17,14 +17,16 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::err
     let icon = Image::new_owned(rgba.into_raw(), width, height);
 
     let pause_item = MenuItem::with_id(app, "toggle_pause", "暂停监控", true, None::<&str>)?;
+    let shortcut_item = MenuItem::with_id(app, "toggle_shortcuts", "禁用快捷键", true, None::<&str>)?;
+    let separator1 = PredefinedMenuItem::separator(app)?;
     let settings_item = MenuItem::with_id(app, "settings", "设置", true, None::<&str>)?;
     let restart_item = MenuItem::with_id(app, "restart", "重启程序", true, None::<&str>)?;
-    let separator = PredefinedMenuItem::separator(app)?;
+    let separator2 = PredefinedMenuItem::separator(app)?;
     let quit_item = MenuItem::with_id(app, "quit", "退出程序", true, None::<&str>)?;
 
     let menu = Menu::with_items(
         app,
-        &[&pause_item, &settings_item, &restart_item, &separator, &quit_item],
+        &[&pause_item, &shortcut_item, &separator1, &settings_item, &restart_item, &separator2, &quit_item],
     )?;
 
     let _tray = TrayIconBuilder::with_id("main-tray")
@@ -34,17 +36,22 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::err
         .tooltip("ElegantClipboard")
         .on_menu_event(move |app, event| {
             let id = event.id.as_ref();
-            if id == "toggle_pause" {
-                if let Some(state) = app.try_state::<Arc<AppState>>() {
-                    let paused = state.monitor.toggle_user_pause();
-                    let _ = pause_item.set_text(if paused { "恢复监控" } else { "暂停监控" });
-                    if let Some(tray) = app.tray_by_id("main-tray") {
-                        let tip = if paused { "ElegantClipboard (已暂停)" } else { "ElegantClipboard" };
-                        let _ = tray.set_tooltip(Some(tip));
+            match id {
+                "toggle_pause" => {
+                    if let Some(state) = app.try_state::<Arc<AppState>>() {
+                        let paused = state.monitor.toggle_user_pause();
+                        let _ = pause_item.set_text(if paused { "恢复监控" } else { "暂停监控" });
+                        if let Some(tray) = app.tray_by_id("main-tray") {
+                            let tip = if paused { "ElegantClipboard (已暂停)" } else { "ElegantClipboard" };
+                            let _ = tray.set_tooltip(Some(tip));
+                        }
                     }
                 }
-            } else {
-                handle_menu_event(app, id);
+                "toggle_shortcuts" => {
+                    let disabled = crate::toggle_shortcuts_disabled(app);
+                    let _ = shortcut_item.set_text(if disabled { "恢复快捷键" } else { "禁用快捷键" });
+                }
+                _ => handle_menu_event(app, id),
             }
         })
         .on_tray_icon_event(|tray, event| {
@@ -85,7 +92,7 @@ pub fn setup_tray<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::err
 }
 
 /// 处理托盘菜单事件
-fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
+fn handle_menu_event(app: &AppHandle, id: &str) {
     match id {
         "settings" => {
             let _ = open_settings_window(app);
@@ -107,7 +114,7 @@ fn handle_menu_event<R: Runtime>(app: &AppHandle<R>, id: &str) {
 }
 
 /// 打开或聚焦设置窗口，居中于主窗口所在的显示器
-pub(crate) fn open_settings_window<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
+pub(crate) fn open_settings_window(app: &AppHandle) -> Result<(), String> {
     // 设置窗口已存在则聚焦
     if let Some(window) = app.get_webview_window("settings") {
         let _ = window.unminimize();

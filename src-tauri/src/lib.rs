@@ -41,6 +41,42 @@ static ACTIVE_QUICK_PASTE_SLOTS: std::sync::LazyLock<parking_lot::Mutex<HashSet<
     std::sync::LazyLock::new(|| parking_lot::Mutex::new(HashSet::new()));
 /// simulate_paste 释放修饰键时可能导致 OS 重新触发快捷键，用此标志拦截假触发
 static PASTE_IN_PROGRESS: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+/// 快捷键是否已被用户临时禁用（Win+V 除外）
+static SHORTCUTS_DISABLED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// 临时禁用所有快捷键（Win+V 除外），返回切换后的禁用状态
+pub fn toggle_shortcuts_disabled(app: &tauri::AppHandle) -> bool {
+    use std::sync::atomic::Ordering;
+    let was = SHORTCUTS_DISABLED.fetch_xor(true, Ordering::SeqCst);
+    let disabled = !was;
+    if disabled {
+        // 注销主快捷键
+        if let Some(sc) = parse_shortcut(&get_current_shortcut()) {
+            let _ = app.global_shortcut().unregister(sc);
+        }
+        // 注销快速粘贴快捷键
+        for s in CURRENT_QUICK_PASTE_SHORTCUTS.read().iter() {
+            if let Some(sc) = parse_shortcut(s) {
+                let _ = app.global_shortcut().unregister(sc);
+            }
+        }
+        tracing::info!("All shortcuts disabled (except Win+V)");
+    } else {
+        // 恢复主快捷键
+        if let Some(sc) = parse_shortcut(&get_current_shortcut()) {
+            let _ = app.global_shortcut().on_shortcut(sc, |app, _shortcut, event| {
+                if event.state == ShortcutState::Pressed {
+                    commands::window::toggle_window_visibility(app);
+                }
+            });
+        }
+        // 恢复快速粘贴快捷键
+        let shortcuts = CURRENT_QUICK_PASTE_SHORTCUTS.read().clone();
+        apply_quick_paste_shortcuts(app, &shortcuts);
+        tracing::info!("All shortcuts re-enabled");
+    }
+    disabled
+}
 
 fn default_quick_paste_shortcuts() -> Vec<String> {
     (1..=9).map(|slot| format!("Alt+{}", slot)).collect()
