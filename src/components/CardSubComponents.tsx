@@ -30,7 +30,7 @@ import {
 import { cn } from "@/lib/utils";
 import type { ClipboardItem } from "@/stores/clipboard";
 
-// ============ Types ============
+// ============ 类型定义 ============
 
 export interface FileListItem {
   name: string;
@@ -48,7 +48,7 @@ export interface ContextMenuItemConfig {
   separator?: boolean;
 }
 
-// ============ File Details Dialog ============
+// ============ 文件详情对话框 ============
 
 interface FileDetailsDialogProps {
   open: boolean;
@@ -121,7 +121,7 @@ export const FileDetailsDialog = ({
   </Dialog>
 );
 
-// ============ Move to Group (inline collapsible) ============
+// ============ 移动到分组（内联折叠） ============
 
 export function MoveToGroupSection({
   itemId,
@@ -170,7 +170,7 @@ export function MoveToGroupSection({
   );
 }
 
-// ============ Action Toolbar ============
+// ============ 操作工具栏 ============
 
 interface ActionToolbarProps {
   item: ClipboardItem;

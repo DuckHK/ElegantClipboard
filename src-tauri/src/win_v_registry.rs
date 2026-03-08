@@ -76,7 +76,7 @@ pub fn enable_win_v_hotkey(restart_explorer: bool) -> Result<(), String> {
 fn restart_explorer_process() -> Result<(), String> {
     use std::process::Command;
 
-    // 关闭 Explorer
+    // 结束 Explorer 进程
     let _ = Command::new("taskkill")
         .args(["/F", "/IM", "explorer.exe"])
         .output();
@@ -84,7 +84,7 @@ fn restart_explorer_process() -> Result<(), String> {
     // 等待片刻
     std::thread::sleep(std::time::Duration::from_millis(1000));
 
-    // 启动 Explorer
+    // 重新启动 Explorer
     if Command::new("cmd")
         .args(["/C", "start", "explorer.exe"])
         .spawn()
@@ -95,7 +95,7 @@ fn restart_explorer_process() -> Result<(), String> {
             .map_err(|e| format!("无法启动Explorer进程: {}", e))?;
     }
 
-    // 等待 Explorer 启动
+    // 等待 Explorer 就绪
     std::thread::sleep(std::time::Duration::from_millis(1000));
 
     Ok(())
@@ -117,7 +117,7 @@ pub fn is_win_v_hotkey_disabled() -> bool {
     current_value.contains('V')
 }
 
-// 非 Windows 平台占位实现
+// 非 Windows 平台占位
 #[cfg(not(windows))]
 pub fn disable_win_v_hotkey(_restart_explorer: bool) -> Result<(), String> {
     Err("Win+V registry modification is only available on Windows".to_string())

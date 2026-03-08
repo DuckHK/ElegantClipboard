@@ -102,7 +102,7 @@ export function Settings() {
     });
   }, []);
 
-  // ESC to close settings window
+  // ESC 关闭设置窗口
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -118,7 +118,7 @@ export function Settings() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Auto save when settings change (skip until initial load completes)
+  // 设置变更时自动保存（跳过初始加载）
   useEffect(() => {
     if (!settingsLoadedRef.current) return;
     const timer = setTimeout(() => {
@@ -188,7 +188,7 @@ export function Settings() {
 
   const saveSettings = async () => {
     try {
-      // Save settings to database (data_path is handled separately by GeneralTab with migration)
+      // 保存设置到数据库（data_path 由 GeneralTab 单独处理迁移）
       await invoke("set_setting", {
         key: "max_history_count",
         value: settings.max_history_count.toString(),
@@ -207,7 +207,7 @@ export function Settings() {
         await invoke("disable_autostart");
       }
 
-      // Handle admin launch setting
+      // 处理管理员启动设置
       if (settings.admin_launch) {
         await invoke("enable_admin_launch");
       } else {

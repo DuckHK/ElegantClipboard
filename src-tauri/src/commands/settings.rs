@@ -364,7 +364,7 @@ fn read_accent_color_from_registry() -> Option<String> {
         .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent")
         .ok()?;
     let color_value: u32 = accent_key.get_value("AccentColorMenu").ok()?;
-    // ABGR 格式
+    // ABGR 格式解析
     let r = (color_value & 0xFF) as f64;
     let g = ((color_value >> 8) & 0xFF) as f64;
     let b = ((color_value >> 16) & 0xFF) as f64;
@@ -421,7 +421,7 @@ pub fn start_accent_color_watcher(app_handle: tauri::AppHandle) {
             RegisterClassW(&wc);
 
             // 创建隐藏顶级窗口接收广播消息
-            // 注意：不能用 HWND_MESSAGE，纯消息窗口无法收到 WM_SETTINGCHANGE 广播
+            // 不能用 HWND_MESSAGE，纯消息窗口无法收 WM_SETTINGCHANGE
             let _ = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 class_name,
@@ -437,7 +437,7 @@ pub fn start_accent_color_watcher(app_handle: tauri::AppHandle) {
                 None,
             );
 
-            // 消息循环（阻塞直到 WM_QUIT）
+            // 消息循环
             let mut msg = MSG::default();
             while GetMessageW(&mut msg, None, 0, 0).as_bool() {
                 let _ = TranslateMessage(&msg);
@@ -453,13 +453,12 @@ pub async fn get_system_accent_color() -> Result<Option<String>, String> {
     #[cfg(target_os = "windows")]
     {
         unsafe {
-            // 方式一：注册表 AccentColorMenu（用户实际选择的强调色）
+            // 优先注册表 AccentColorMenu
             if let Some(color) = read_accent_color_from_registry() {
                 return Ok(Some(color));
             }
 
-            // 方式二：回退到 DwmGetColorizationColor
-            // 注意：此值为 DWM 窗口边框混合色，因透明度混合可能与用户选择的强调色不同
+            // 回退 DwmGetColorizationColor（DWM 混合色，可能与强调色略有差异）
             use windows::Win32::Graphics::Dwm::DwmGetColorizationColor;
             use windows_core::BOOL;
 

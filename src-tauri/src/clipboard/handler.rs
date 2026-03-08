@@ -148,8 +148,7 @@ impl ClipboardHandler {
     }
 
     fn get_dedup_strategy(&self) -> &str {
-        // 缓存策略值避免每次查库（handler 生命周期与 monitor 相同）
-        // 但 settings 可能被用户修改，所以每次都读
+        // 每次读取策略（用户可能修改设置）
         match self
             .settings_repo
             .get("dedup_strategy")
@@ -233,7 +232,7 @@ impl ClipboardHandler {
             .flatten()
             .unwrap_or_else(|| "blacklist".to_string());
 
-        // 从 exe_path 提取文件名
+        // 提取可执行文件名
         let exe_name = std::path::Path::new(&source.exe_path)
             .file_name()
             .and_then(|n| n.to_str())
@@ -260,7 +259,7 @@ impl ClipboardHandler {
     ) -> Result<Option<i64>, String> {
         let max_content_size = self.get_max_content_size();
 
-        // max_content_size 仅限制文本类内容，图片和文件不受此限制
+        // max_content_size 仅限制文本类内容
         if max_content_size > 0 {
             let is_text_content = matches!(
                 content,

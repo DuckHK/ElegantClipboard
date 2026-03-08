@@ -289,8 +289,7 @@ impl Database {
             info!("Migration complete: group_id column added, table rebuilt");
         }
 
-        // Migration 7: allow duplicate content_hash entries for dedup_strategy=always_new.
-        // Keep hash indexes for lookup performance, but remove uniqueness constraints.
+        // 迁移 7: 允许重复 content_hash（always_new 策略），保留索引但移除唯一约束
         conn.execute_batch(
             "DROP INDEX IF EXISTS idx_clipboard_hash_default;
              DROP INDEX IF EXISTS idx_clipboard_hash_group;

@@ -178,7 +178,7 @@ export function DisplayTab() {
     setToolbarButtons(next);
   };
 
-  // Ordered list: active buttons first (in their order), then inactive ones
+  // 排序：激活按钮在前（保持顺序），未激活在后
   const orderedButtons: ToolbarButton[] = [
     ...toolbarButtons,
     ...ALL_TOOLBAR_BUTTONS.filter((b) => !toolbarButtons.includes(b)),

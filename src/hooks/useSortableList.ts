@@ -30,7 +30,7 @@ interface UseSortableListOptions<T extends SortableItem> {
   onDragEnd: (oldIndex: number, newIndex: number) => void;
 }
 
-// Only start drag from explicit drag handle; keep click/paste path deterministic.
+// 仅从拖拽手柄启动拖拽，确保点击/粘贴路径确定
 function shouldHandleDrag(element: EventTarget | null): boolean {
   let cur = element as HTMLElement | null;
   let hasDragHandle = false;
@@ -38,11 +38,11 @@ function shouldHandleDrag(element: EventTarget | null): boolean {
     if (cur.dataset?.dragHandle === "true") {
       hasDragHandle = true;
     }
-    // Ignore drag on elements with data-drag-ignore or data-no-drag
+    // 忽略标记了 drag-ignore 或 no-drag 的元素
     if (cur.dataset && (cur.dataset.dragIgnore === "true" || cur.dataset.noDrag === "true")) {
       return false;
     }
-    // Ignore drag on OverlayScrollbars elements
+    // 忽略滚动条元素
     if (cur.classList && (
       cur.classList.contains('os-scrollbar') ||
       cur.classList.contains('os-scrollbar-track') ||
@@ -55,7 +55,7 @@ function shouldHandleDrag(element: EventTarget | null): boolean {
   return hasDragHandle;
 }
 
-// Custom MouseSensor that only activates on left-button drag handle mousedown.
+// 自定义鼠标传感器：仅左键点击拖拽手柄时激活
 class CustomMouseSensor extends MouseSensor {
   static activators = [
     {
@@ -70,7 +70,7 @@ class CustomMouseSensor extends MouseSensor {
   ];
 }
 
-// Optimized measuring configuration for better performance
+// 优化的测量配置
 const measuringConfig: MeasuringConfiguration = {
   droppable: {
     strategy: MeasuringStrategy.Always,
@@ -84,7 +84,7 @@ export function useSortableList<T extends SortableItem>({
   const [activeId, setActiveId] = useState<string | null>(null);
   const itemsRef = useRef(items);
 
-  // Keep itemsRef in sync (via effect to avoid writing refs during render)
+  // 保持 itemsRef 同步（通过 effect 避免渲染期写 ref）
   useEffect(() => {
     itemsRef.current = items;
   }, [items]);
@@ -92,7 +92,7 @@ export function useSortableList<T extends SortableItem>({
   const sensors = useSensors(
     useSensor(CustomMouseSensor, {
       activationConstraint: {
-        distance: 1, // Minimal distance for immediate drag feedback
+        distance: 1, // 最小距离，立即响应拖拽
       },
     }),
     useSensor(KeyboardSensor, {
@@ -100,11 +100,10 @@ export function useSortableList<T extends SortableItem>({
     })
   );
 
-  // Collision detection - allow cross-region drag (pinned <-> regular)
+  // 碰撞检测：允许跨区域拖拽（置顶 ↔ 普通）
   const customCollisionDetection: CollisionDetection = useCallback(
     (args) => {
-      // Simply use closestCenter without filtering by pinned status
-      // This allows dragging between pinned and regular areas
+      // 使用 closestCenter，不按置顶状态过滤
       return closestCenter(args);
     },
     []
@@ -120,7 +119,7 @@ export function useSortableList<T extends SortableItem>({
       setActiveId(null);
 
       if (over && active.id !== over.id) {
-        // Use ref for items to avoid stale closure
+        // 用 ref 避免闭包过期
         const currentItems = itemsRef.current;
         const oldIndex = currentItems.findIndex((item) => item._sortId === active.id);
         const newIndex = currentItems.findIndex((item) => item._sortId === over.id);
@@ -137,7 +136,7 @@ export function useSortableList<T extends SortableItem>({
     setActiveId(null);
   }, []);
 
-  // Get currently dragged item
+  // 获取当前拖拽项
   const activeItem = activeId
     ? itemsRef.current.find(
         (item) => item._sortId === activeId || String(item.id) === activeId

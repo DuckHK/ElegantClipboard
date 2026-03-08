@@ -1,4 +1,4 @@
-// Pure formatting and parsing utilities for clipboard items
+// 剪贴板条目格式化与解析工具
 
 export const contentTypeConfig: Record<string, { label: string }> = {
   text: { label: "文本" },

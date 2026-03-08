@@ -4,7 +4,7 @@ import * as SwitchPrimitives from "@radix-ui/react-switch"
 import { cn } from "@/lib/utils"
 
 interface SwitchProps extends React.ComponentPropsWithoutRef<typeof SwitchPrimitives.Root> {
-  /** Show indicator icons on thumb */
+  /** 滑块上显示指示图标 */
   showIndicator?: boolean
 }
 
@@ -30,7 +30,7 @@ const Switch = React.forwardRef<
         "h-5 w-5 rounded-full bg-background shadow-md",
         "ring-0 transition-all duration-200",
         "data-[state=checked]:translate-x-5 data-[state=unchecked]:translate-x-0",
-        // Press feedback: shrink on press, expand on release
+        // 按压反馈：按下缩小，释放恢复
         "group-active/switch:scale-90 group-active/switch:shadow-sm"
       )}
     >

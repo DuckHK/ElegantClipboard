@@ -102,7 +102,7 @@ impl ClipboardMonitor {
         self.running.store(false, Ordering::SeqCst);
         info!("Clipboard monitor stopping");
 
-        // 等待线程退出（运行标志已置 false，线程应自行停止）
+        // 等待线程退出
         if let Some(handle) = self.thread_handle.lock().take() {
             let _ = handle.join();
         }
@@ -295,7 +295,7 @@ fn read_clipboard_content() -> Option<ClipboardContent> {
         Err(e) => debug!("Clipboard get_image failed: {} (may not contain image data or format unsupported)", e),
     }
 
-    // 尝试获取 HTML 富文本
+    // 尝试获取 HTML
     if ctx.has(clipboard_rs::ContentFormat::Html) {
         match ctx.get_html() {
             Ok(html) if !html.is_empty() => {

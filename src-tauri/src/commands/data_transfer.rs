@@ -56,7 +56,7 @@ fn sanitize_zip_relative_path(name: &str) -> Option<std::path::PathBuf> {
         match component {
             Component::Normal(seg) => clean.push(seg),
             Component::CurDir => {}
-            // Reject root/prefix/parent dir to prevent zip-slip style writes.
+            // 拒绝根/前缀/父目录防止路径穿越
             Component::RootDir | Component::Prefix(_) | Component::ParentDir => return None,
         }
     }
@@ -302,7 +302,7 @@ pub async fn import_data(app: tauri::AppHandle) -> Result<String, String> {
             }
         };
 
-        // Skip transient DB files; only import clipboard.db plus asset folders.
+        // 跳过临时数据库文件，仅导入 clipboard.db 和资产目录
         if rel_path.ends_with("clipboard.db-wal") || rel_path.ends_with("clipboard.db-shm") {
             continue;
         }

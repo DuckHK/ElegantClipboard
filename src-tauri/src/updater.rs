@@ -100,7 +100,7 @@ fn read_system_proxy() -> Option<ureq::Proxy> {
     None
 }
 
-// ── GitHub API 响应类型 ────────────────────────────────────────────────
+// ── GitHub API 响应类型 ──
 
 #[derive(Debug, Deserialize)]
 struct GitHubRelease {
@@ -150,7 +150,7 @@ pub fn check_update() -> Result<UpdateInfo, String> {
             req = req.header("Authorization", &format!("Bearer {}", token));
         }
 
-    // GitHub 返回的列表已按发布时间倒序排列（最新在前）
+    // GitHub 列表已按发布时间倒序
     let releases: Vec<GitHubRelease> = match req.call() {
         Ok(mut resp) => resp
             .body_mut()
@@ -191,7 +191,7 @@ pub fn check_update() -> Result<UpdateInfo, String> {
     let latest_release = newer_releases[0];
     let latest_version = latest_release.tag_name.trim_start_matches('v').to_string();
 
-    // 查找与当前架构匹配的 NSIS 安装包（取自最新版本）
+    // 查找匹配架构的 NSIS 安装包
     let arch_suffix = match std::env::consts::ARCH {
         "aarch64" => "arm64-setup.exe",
         _ => "x64-setup.exe",

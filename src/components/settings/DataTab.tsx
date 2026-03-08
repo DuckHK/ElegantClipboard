@@ -200,7 +200,7 @@ export function DataTab({ settings, onSettingsChange }: DataTabProps) {
       await invoke(config.command);
       setCleanDialogAction(null);
       if (config.needsRestart) {
-        // Clear frontend persisted UI settings so they don't survive the restart
+        // 清除前端持久化设置以免重启后残留
         localStorage.removeItem("clipboard-ui-settings");
         sessionStorage.removeItem("data-size-cache");
         await invoke("restart_app");
@@ -238,7 +238,7 @@ export function DataTab({ settings, onSettingsChange }: DataTabProps) {
     try {
       const path = await invoke<string | null>("select_folder_for_settings");
       if (path && path !== settings.data_path) {
-        // Check if there's existing data to migrate
+        // 检查是否有现有数据需要迁移
         const currentPath = await invoke<string>("get_default_data_path");
         if (currentPath && currentPath !== path) {
           const hasData = await invoke<boolean>("check_path_has_data", { path });
@@ -247,7 +247,7 @@ export function DataTab({ settings, onSettingsChange }: DataTabProps) {
           setMigrationError(null);
           setMigrationDialogOpen(true);
         } else {
-          // No migration needed, just set the path
+          // 无需迁移，直接设置路径
           await invoke("set_data_path", { path });
           onSettingsChange({ ...settings, data_path: path });
         }
@@ -271,7 +271,7 @@ export function DataTab({ settings, onSettingsChange }: DataTabProps) {
       if (result.errors.length > 0) {
         setMigrationError(`迁移完成但有错误: ${result.errors.join(", ")}`);
       } else {
-        // Success - restart app
+        // 成功，重启应用
         setMigrationDialogOpen(false);
         onSettingsChange({ ...settings, data_path: pendingPath });
         await invoke("restart_app");
@@ -292,7 +292,7 @@ export function DataTab({ settings, onSettingsChange }: DataTabProps) {
       await invoke("set_data_path", { path: pendingPath });
       onSettingsChange({ ...settings, data_path: pendingPath });
       setMigrationDialogOpen(false);
-      // Restart to use new path
+      // 重启以使用新路径
       await invoke("restart_app");
     } catch (error) {
       setMigrationError(`设置失败: ${error}`);

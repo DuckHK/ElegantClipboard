@@ -35,7 +35,7 @@ interface UISettings {
   keyboardNavigation: boolean;
   searchAutoFocus: boolean;
   searchAutoClear: boolean;
-  // New settings
+  // 新增设置
   darkMode: DarkMode;
   cardDensity: CardDensity;
   timeFormat: TimeFormat;
@@ -91,7 +91,7 @@ interface UISettings {
 const STORAGE_KEY = "clipboard-ui-settings";
 const SYNC_EVENT = "ui-settings-changed";
 
-// Helper to broadcast settings change
+// 广播设置变更
 const broadcastChange = (state: Partial<UISettings>) => {
   emit(SYNC_EVENT, state).catch(() => {});
 };
@@ -99,7 +99,7 @@ const broadcastChange = (state: Partial<UISettings>) => {
 export const useUISettings = create<UISettings>()(
   persist(
     (set) => {
-      // Factory: creates a setter that updates state and broadcasts the change
+      // 工厂方法：创建更新状态并广播变更的 setter
       const makeSetter = <K extends keyof UISettings>(key: K) =>
         (value: UISettings[K]) => {
           set({ [key]: value } as unknown as Partial<UISettings>);
@@ -177,7 +177,7 @@ export const useUISettings = create<UISettings>()(
         setWindowAnimation: makeSetter("windowAnimation"),
         setToolbarButtons: makeSetter("toolbarButtons"),
 
-        // Special setters with extra side effects
+        // 带额外副作用的 setter
         setKeyboardNavigation: (enabled) => {
           set({ keyboardNavigation: enabled });
           broadcastChange({ keyboardNavigation: enabled });
@@ -197,23 +197,23 @@ export const useUISettings = create<UISettings>()(
   )
 );
 
-// Track listener to prevent duplicate registration
+// 跟踪监听器防止重复注册
 let unlistenFn: (() => void) | null = null;
 
-// Initialize settings listener (called once per window)
+// 初始化设置监听器（每个窗口调用一次）
 export async function initUISettingsListener() {
-  if (unlistenFn) return; // Already initialized
+  if (unlistenFn) return; // 已初始化
   
   try {
     unlistenFn = await listen<Partial<UISettings>>(SYNC_EVENT, (event) => {
       useUISettings.setState(event.payload);
     });
   } catch {
-    // Ignore errors (e.g., in non-Tauri environment)
+    // 忽略错误（如非 Tauri 环境）
   }
 }
 
-// Cleanup listener (call on window close if needed)
+// 清理监听器
 export function cleanupUISettingsListener() {
   if (unlistenFn) {
     unlistenFn();
@@ -221,7 +221,7 @@ export function cleanupUISettingsListener() {
   }
 }
 
-// Auto-initialize in browser environment
+// 浏览器环境自动初始化
 if (typeof window !== "undefined") {
   initUISettingsListener();
 }

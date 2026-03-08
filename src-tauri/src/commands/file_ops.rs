@@ -47,7 +47,7 @@ pub async fn show_in_explorer(path: String) -> Result<(), String> {
 
     let path = Path::new(&path);
 
-    // 使用 /select 参数高亮文件（与 open_path_in_explorer 不同）
+    // 使用 /select 参数在资源管理器中高亮文件
     #[cfg(target_os = "windows")]
     {
         let path_str = path.to_string_lossy();

@@ -328,7 +328,7 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
               onClick={async () => {
                 if (pendingAdminLaunch !== null) {
                   try {
-                    // Directly save to backend
+                    // 直接保存到后端
                     if (pendingAdminLaunch) {
                       await invoke("enable_admin_launch");
                     } else {
@@ -349,7 +349,7 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
               onClick={async () => {
                 if (pendingAdminLaunch !== null) {
                   try {
-                    // Directly save to backend before restart
+                    // 重启前保存到后端
                     if (pendingAdminLaunch) {
                       await invoke("enable_admin_launch");
                     } else {

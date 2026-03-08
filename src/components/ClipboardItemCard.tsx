@@ -64,7 +64,7 @@ import { useClipboardStore, ClipboardItem } from "@/stores/clipboard";
 import { useGroupStore } from "@/stores/groups";
 import { useUISettings } from "@/stores/ui-settings";
 
-// ============ Types ============
+// ============ 类型定义 ============
 
 interface ClipboardItemCardProps {
   item: ClipboardItem;
@@ -77,9 +77,9 @@ interface ClipboardItemCardProps {
 const clipboardActions = () => useClipboardStore.getState();
 const fileValidityCache = new Map<string, boolean>();
 
-// ============ Main Card Component ============
+// ============ 主卡片组件 ============
 
-// Simplified memoization - only compare essential props that affect rendering
+// 简化的 memo 比较，仅对比影响渲染的关键 props
 const arePropsEqual = (
   prevProps: ClipboardItemCardProps,
   nextProps: ClipboardItemCardProps,
@@ -89,7 +89,7 @@ const arePropsEqual = (
   if (prevProps.sortId !== nextProps.sortId) return false;
   if (prevProps.isDragOverlay !== nextProps.isDragOverlay) return false;
 
-  // Compare essential item properties
+  // 对比关键 item 属性
   const item = prevProps.item;
   const nextItem = nextProps.item;
 
@@ -225,7 +225,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   } = useSortable({
     id: sortId || `item-${item.id}`,
     disabled: isDragOverlay || batchMode,
-    // Keep reorder motion crisp and avoid bounce-like release feel.
+    // 保持拖拽动画干净利落
     transition: {
       duration: 120,
       easing: "ease-out",
@@ -254,7 +254,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     return items;
   }, [showTime, showCharCount, showByteSize, timeFormat, item.created_at, item.char_count, item.byte_size]);
 
-  // ---- Event handlers ----
+  // ---- 事件处理 ----
   const clearTextPreviewTimer = useCallback(() => {
     if (textPreviewTimerRef.current) {
       clearTimeout(textPreviewTimerRef.current);
@@ -375,7 +375,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   }, [hideTextPreview]);
 
   const handleTextWheel = useCallback((e: React.WheelEvent<HTMLDivElement>) => {
-    // Reuse Ctrl+wheel gesture for text preview scrolling to avoid accidental list scrolling.
+    // Ctrl+滚轮滚动文本预览，避免误触列表滚动
     if (!e.ctrlKey || !textPreviewVisibleRef.current) return;
     e.preventDefault();
     e.stopPropagation();
@@ -410,7 +410,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     };
   }, [hideTextPreview]);
 
-  // Cancel text preview timer when main window hides (prevents timer race on paste)
+  // 主窗口隐藏时取消文本预览计时器
   useEffect(() => {
     const unlisten = listen("window-hidden", () => {
       hideTextPreview();
@@ -485,7 +485,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
   };
 
   const handleSaveAs = async () => {
-    // For images: save from image_path; for files: save the first file
+    // 图片从 image_path 保存，文件取第一个
     const sourcePath =
       item.content_type === "image" ? item.image_path : filePaths[0];
     if (!sourcePath) return;
@@ -505,7 +505,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     }
   };
 
-  // ---- Card content ----
+  // ---- 卡片内容 ----
 
   const cardContent = (
     <div ref={setNodeRef} style={style}>

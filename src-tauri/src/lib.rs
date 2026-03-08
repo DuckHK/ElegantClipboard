@@ -160,7 +160,7 @@ fn apply_quick_paste_shortcuts(
 
                     let is_first = {
                         let mut active = ACTIVE_QUICK_PASTE_SLOTS.lock();
-                        active.insert(slot) // true = newly inserted
+                        active.insert(slot) // true = 新插入
                     };
 
                     let state = app.state::<Arc<AppState>>().inner().clone();
@@ -578,9 +578,7 @@ pub fn run() {
 
                 #[cfg(target_os = "windows")]
                 {
-                    // Ensure WS_EX_LAYERED is set at startup so the window is
-                    // opaque before initTheme() runs. This prevents a transparent
-                    // flash on Windows 10 where DWM effects are not supported.
+                    // 启动时设置 WS_EX_LAYERED 确保窗口不透明，防止 Win10 无 DWM 特效时闪烁
                     {
                         use windows::Win32::Foundation::HWND;
                         use windows::Win32::UI::WindowsAndMessaging::{

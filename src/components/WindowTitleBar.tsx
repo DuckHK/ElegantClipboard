@@ -4,7 +4,7 @@ import { Card } from "@/components/ui/card";
 interface WindowTitleBarProps {
   icon: React.ReactNode;
   title: string;
-  /** Extra content shown after the title (e.g. unsaved indicator) */
+  /** 标题后的额外内容（如未保存指示器） */
   extra?: React.ReactNode;
 }
 

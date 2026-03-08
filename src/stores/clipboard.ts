@@ -29,7 +29,7 @@ export interface ClipboardItem {
   char_count: number | null;
   source_app_name: string | null;
   source_app_icon: string | null;
-  /** Whether all files exist (only for "files" content_type, computed at query time) */
+  /** 所有文件是否存在（仅 files 类型，查询时计算） */
   files_valid?: boolean;
 }
 
@@ -40,14 +40,14 @@ interface ClipboardState {
   selectedGroup: string | null;
   /** 当前选中的自定义分组 id（与 selectedGroup 互斥） */
   selectedGroupId: number | null;
-  /** Currently keyboard-highlighted item index (-1 = none) */
+  /** 当前键盘高亮索引（-1 表示无） */
   activeIndex: number;
-  /** Monotonic counter to discard stale fetch results */
+  /** 单调计数器，丢弃过期请求 */
   _fetchId: number;
-  /** Incremented when the view should reset (scroll to top, etc.) */
+  /** 视图重置计数（滚动到顶部等） */
   _resetToken: number;
 
-  // Actions
+  // 操作
   fetchItems: (options?: {
     search?: string;
     content_type?: string;
@@ -67,11 +67,11 @@ interface ClipboardState {
   pasteAsPlainText: (id: number) => Promise<void>;
   clearHistory: (contentType?: string | null) => Promise<void>;
   refresh: () => Promise<void>;
-  /** Reset view state: clear search, clear type filter, scroll to top, refresh */
+  /** 重置视图：清除搜索、类型筛选，滚动到顶部，刷新 */
   resetView: () => Promise<void>;
   setupListener: () => Promise<() => void>;
 
-  // Batch selection
+  // 批量选择
   batchMode: boolean;
   selectedIds: Set<number>;
   lastSelectedIndex: number;
@@ -140,8 +140,7 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
 
   setSearchQuery: (query: string) => {
     set({ searchQuery: query });
-    // Note: Debouncing is handled in App.tsx with useMemo + debounce
-    // This just updates the query state
+    // 仅更新查询状态，防抖在 App.tsx 中处理
   },
 
   setSelectedGroup: (group: string | null) => {
@@ -162,7 +161,7 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
   togglePin: async (id: number) => {
     try {
       await invoke<boolean>("toggle_pin", { id });
-      // Refresh to get correct sort order (pinned items first)
+      // 刷新以获取正确排序（置顶优先）
       await get().refresh();
     } catch (error) {
       logError("Failed to toggle pin:", error);
@@ -190,7 +189,7 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
   moveItem: async (fromId: number, toId: number) => {
     try {
       await invoke("move_clipboard_item", { fromId, toId });
-      // Refresh to get updated order
+      // 刷新以获取更新后的顺序
       await get().refresh();
     } catch (error) {
       logError("Failed to move item:", error);
@@ -262,7 +261,7 @@ export const useClipboardStore = create<ClipboardState>((set, get) => ({
     return unlisten;
   },
 
-  // Batch selection
+  // 批量选择
   batchMode: false,
   selectedIds: new Set<number>(),
   lastSelectedIndex: -1,

@@ -83,7 +83,7 @@ export function ClipboardList() {
   const cardDensity = useUISettings((s) => s.cardDensity);
 
   useEffect(() => {
-    // Fetch items once on mount.
+    // 组件挂载时加载数据
     fetchItems();
     if (listenerRef.current) return;
     let mounted = true;
@@ -109,7 +109,7 @@ export function ClipboardList() {
   const renderedItems = optimisticItems ?? itemsWithSortId;
 
   useEffect(() => {
-    // Server-confirmed order arrived; clear optimistic view.
+    // 服务端确认顺序到达，清除乐观视图
     setOptimisticItems(null);
   }, [itemsWithSortId]);
 
@@ -120,7 +120,7 @@ export function ClipboardList() {
   );
 
   // 搜索/类型筛选时隐藏快捷粘贴序号（过滤后的顺序与快捷粘贴槽位顺序不一致）
-  // 自定义分组下仍显示序号：quick_paste 是分组隔离的，序号与当前视图一致
+  // 自定义分组仍显示序号（quick_paste 分组隔离）
   const showSlotBadges = !searchQuery && !selectedGroup;
 
   const handleDragEnd = useCallback(
@@ -135,7 +135,7 @@ export function ClipboardList() {
       const fromIsPinned = oldIndex < currentPinnedCount;
       const toIsPinned = newIndex < currentPinnedCount;
 
-      // Reorder in UI first so overlay drops directly to the destination slot.
+      // 先在 UI 上重排，让拖拽覆盖层直接落到目标位置
       setOptimisticItems(() => {
         const next = [...currentItems];
         const [moved] = next.splice(oldIndex, 1);
@@ -152,7 +152,7 @@ export function ClipboardList() {
           await moveItem(fromItem.id, toItem.id);
         }
       } catch {
-        // Store actions already log errors.
+        // store 内部已记录错误
       } finally {
         setOptimisticItems(null);
       }
@@ -190,7 +190,7 @@ export function ClipboardList() {
       }
     };
 
-    // 使用 capture phase 确保在其他事件处理器之前捕获
+    // capture 阶段优先捕获
     document.addEventListener("wheel", handleWheel, {
       passive: false,
       capture: true,
@@ -203,7 +203,7 @@ export function ClipboardList() {
     };
   }, [activeId]);
 
-  // 监听滚动位置，控制回到顶部按钮的显示——节流避免滚动时大量 re-render
+  // 监听滚动位置，控制回到顶部按钮显示（节流）
   useEffect(() => {
     if (!customScrollParent) return;
     let ticking = false;
@@ -219,7 +219,7 @@ export function ClipboardList() {
     return () => customScrollParent.removeEventListener("scroll", handleScroll);
   }, [customScrollParent]);
 
-  // 回到顶部 - 使用 Virtuoso scrollToIndex API（虚拟列表直接操作 scrollTop 无法正确回到顶部）
+  // 回到顶部（使用 Virtuoso scrollToIndex API）
   const scrollToTop = useCallback((smooth = false) => {
     virtuosoRef.current?.scrollToIndex({
       index: 0,
@@ -235,7 +235,7 @@ export function ClipboardList() {
     }
   }, [_resetToken, scrollToTop]);
 
-  // 键盘导航：共用处理函数（DOM keydown 与 Tauri 低级钩子事件均调用此函数）
+  // 键盘导航共用处理函数
   const handleNavKey = useCallback(
     (key: string, shift: boolean) => {
       if (!useUISettings.getState().keyboardNavigation) return;
@@ -307,7 +307,7 @@ export function ClipboardList() {
     [setActiveIndex, pasteContent, pasteAsPlainText, deleteItem],
   );
 
-  // 路径 1：DOM keydown（窗口自身聚焦时，如搜索框）
+  // DOM keydown（窗口聚焦时）
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // 焦点在输入框/文本域时，不拦截任何导航键
@@ -322,8 +322,7 @@ export function ClipboardList() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [handleNavKey]);
 
-  // 路径 2：Tauri 事件（低级键盘钩子转发，窗口无需聚焦）
-  // 窗口聚焦时 DOM keydown 已处理，跳过钩子事件避免重复触发
+  // Tauri 键盘钩子事件（窗口无需聚焦，聚焦时跳过避免重复）
   useEffect(() => {
     let unlisten: (() => void) | undefined;
     let disposed = false;
@@ -499,7 +498,7 @@ export function ClipboardList() {
         dropAnimation={{
           duration: 180,
           easing: "ease-out",
-          // Keep a constant card size while dropping (translate only, no scale).
+          // 拖放时保持卡片尺寸不变（仅平移，不缩放）
           keyframes: ({ transform }) => [
             {
               transform: CSS.Transform.toString({

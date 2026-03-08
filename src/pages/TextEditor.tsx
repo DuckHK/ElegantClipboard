@@ -20,7 +20,7 @@ export function TextEditor() {
   const params = new URLSearchParams(window.location.search);
   const id = Number(params.get("id"));
 
-  // Load theme then show window
+  // 加载主题后显示窗口
   useEffect(() => {
     initTheme().then(async () => {
       const win = getCurrentWindow();
@@ -33,7 +33,7 @@ export function TextEditor() {
     });
   }, []);
 
-  // Load item content
+  // 加载条目内容
   useEffect(() => {
     if (!id) return;
     invoke<{ text_content: string | null }>("get_clipboard_item", { id }).then(
@@ -46,13 +46,13 @@ export function TextEditor() {
     );
   }, [id]);
 
-  // ESC to close
+  // ESC 关闭
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         getCurrentWindow().close();
       }
-      // Ctrl+S to save
+      // Ctrl+S 保存
       if (e.ctrlKey && e.key === "s") {
         e.preventDefault();
         handleSave();

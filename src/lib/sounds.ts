@@ -1,5 +1,4 @@
-// Lightweight sound feedback using synthesized Web Audio tones
-// No external audio files needed
+// 轻量级音效反馈（Web Audio 合成音，无需外部音频文件）
 
 import { useUISettings } from "@/stores/ui-settings";
 

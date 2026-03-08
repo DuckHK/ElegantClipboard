@@ -1,5 +1,4 @@
-// Content-type-specific renderers for clipboard item cards
-// Handles: image preview, file content, and shared footer
+// 剪贴板卡片内容渲染器：图片预览、文件内容、卡片底栏
 
 import { memo, useCallback, useEffect, useRef, useState, useMemo } from "react";
 import {
@@ -17,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useClipboardStore } from "@/stores/clipboard";
 import { useUISettings } from "@/stores/ui-settings";
 
-// ============ Card Footer ============
+// ============ 卡片底栏 ============
 
 interface CardFooterProps {
   metaItems: string[];
@@ -71,7 +70,7 @@ export const CardFooter = ({
   </div>
 );
 
-// ============ Shared Image Preview with Hover Enlarge (Native Window) ============
+// ============ 图片悬浮预览（原生窗口） ============
 
 const PREVIEW_GAP = 12;
 const MIN_SCALE = 0.3;
@@ -80,30 +79,30 @@ const MAX_SCALE_UNBOUNDED = 5.0;
 const BASE_PREVIEW_W = 600;
 const BASE_PREVIEW_H = 500;
 
-/** Positioning bounds for the preview window (physical pixels) */
+/** 预览窗口定位边界（物理像素） */
 interface PreviewBounds {
-  /** Available width (physical px) */
+  /** 可用宽度（物理 px） */
   maxW: number;
-  /** Available height (physical px) */
+  /** 可用高度（物理 px） */
   maxH: number;
-  /** Left edge X for right-side preview, or right edge X for left-side preview (physical px) */
+  /** 预览锚点 X（物理 px） */
   anchorX: number;
-  /** Card center Y on screen (physical px) */
+  /** 卡片中心 Y（物理 px） */
   cardCenterY: number;
-  /** Monitor top Y (physical px) */
+  /** 显示器顶部 Y（物理 px） */
   monY: number;
-  /** Monitor bottom Y (physical px) */
+  /** 显示器底部 Y（物理 px） */
   monBottom: number;
   scale: number;
   side: "left" | "right";
 }
 
-/** Get the available space bounds beside the main window for positioning the preview */
+/** 获取主窗口侧边可用空间边界 */
 export async function getPreviewBounds(
   position: "auto" | "left" | "right",
   cardElement?: HTMLElement | null,
 ): Promise<PreviewBounds> {
-  // Fetch physical coordinates in parallel to reduce latency
+  // 并行获取物理坐标以减少延迟
   const appWindow = getCurrentWindow();
   const [monitor, outerPos, outerSize] = await Promise.all([
     currentMonitor(),
@@ -118,14 +117,12 @@ export async function getPreviewBounds(
   const physMainW = outerSize.width;
   const physMainH = outerSize.height;
 
-  // Work area: compute taskbar offset within the monitor from screen.availLeft/Top vs screen.left/top
+  // 计算任务栏偏移量
   const scr = window.screen as Screen & {
     availTop?: number; availLeft?: number;
     left?: number; top?: number;
   };
-  // screen.left/top = monitor logical position (Chromium-specific)
-  // If unavailable, fall back to 0 offset (assume no taskbar inset) rather than
-  // using availLeft/availTop which are global coords and would produce a wrong delta.
+  // screen.left/top 为显示器逻辑坐标（Chromium），不可用时回退为 0
   const hasScreenLeft = scr.left != null;
   const hasScreenTop = scr.top != null;
   const workOffsetX = hasScreenLeft && scr.availLeft != null
@@ -142,7 +139,7 @@ export async function getPreviewBounds(
   const physGap = Math.round(PREVIEW_GAP * scale);
   const physMinW = Math.round(200 * scale);
 
-  // Card center Y: use physical window position + viewport-relative card offset
+  // 卡片中心 Y：窗口物理位置 + 视口内偏移
   let cardCenterY = physWinY + Math.round(physMainH / 2);
   if (cardElement) {
     const rect = cardElement.getBoundingClientRect();
@@ -163,7 +160,7 @@ export async function getPreviewBounds(
     return {
       maxW: Math.max(physMinW, leftSpace),
       maxH: workH,
-      anchorX: physWinX - physGap, // right edge of available left space
+      anchorX: physWinX - physGap, // 左侧可用空间右边缘
       cardCenterY,
       monY: workY,
       monBottom: workY + workH,
@@ -174,7 +171,7 @@ export async function getPreviewBounds(
   return {
     maxW: Math.max(physMinW, rightSpace),
     maxH: workH,
-    anchorX: physWinX + physMainW + physGap, // left edge of available right space
+    anchorX: physWinX + physMainW + physGap, // 右侧可用空间左边缘
     cardCenterY,
     monY: workY,
     monBottom: workY + workH,
@@ -183,7 +180,7 @@ export async function getPreviewBounds(
   };
 }
 
-/** Calculate image CSS size at a given scale; optional max bounds for bounded mode. */
+/** 计算指定缩放比例下的图片 CSS 尺寸 */
 function calcImageSize(
   imgW: number,
   imgH: number,
@@ -191,7 +188,7 @@ function calcImageSize(
   maxW?: number,
   maxH?: number,
 ) {
-  // Fit to base bounds at scale=1
+  // 按 scale=1 适配基准尺寸
   let baseW = imgW;
   let baseH = imgH;
   if (baseW > BASE_PREVIEW_W || baseH > BASE_PREVIEW_H) {
@@ -201,7 +198,7 @@ function calcImageSize(
   }
   let w = baseW * scale;
   let h = baseH * scale;
-  // Clamp to available space in bounded mode.
+  // 限制在可用空间内（有界模式）
   if (maxW != null && maxH != null && (w > maxW || h > maxH)) {
     const ratio = Math.min(maxW / w, maxH / h);
     w *= ratio;
@@ -215,9 +212,9 @@ interface PreviewState {
   scale: number;
   imgNatural: { w: number; h: number };
   currentPath: string | undefined;
-  /** Cached bounds from showPreview so zoom handler stays synchronous */
+  /** 缓存的边界，供缩放同步处理 */
   bounds: PreviewBounds | null;
-  /** Current preview window size in CSS px */
+  /** 当前预览窗口 CSS 尺寸 */
   windowCss: { w: number; h: number } | null;
 }
 
@@ -287,7 +284,7 @@ const ImagePreview = memo(function ImagePreview({
     ps.current.windowCss = null;
   }, [clearTimer]);
 
-  // Cancel preview timer and reset state when main window hides (prevents timer race on paste)
+  // 主窗口隐藏时取消预览计时器，防止粘贴竞态
   useEffect(() => {
     const unlisten = listen("window-hidden", () => {
       clearTimer();
@@ -299,11 +296,11 @@ const ImagePreview = memo(function ImagePreview({
     return () => { unlisten.then((fn) => fn()); };
   }, [clearTimer]);
 
-  // Show preview: bounded mode uses screen work area; unbounded mode uses a fixed large window.
+  // 显示预览：有界模式用屏幕工作区，无界模式用固定大窗口
   const showPreview = useCallback(async () => {
     if (!containerRef.current || !ps.current.currentPath) return;
     const bounds = await getPreviewBounds(previewPosition, containerRef.current);
-    // Abort if window was hidden during the async gap (currentPath cleared by window-hidden listener)
+    // 异步期间窗口已隐藏则中止
     if (!ps.current.currentPath) return;
     const { imgNatural } = ps.current;
     const boundedMaxCssW = bounds.maxW / bounds.scale;
@@ -322,7 +319,7 @@ const ImagePreview = memo(function ImagePreview({
       ? Math.round(bounds.cardCenterY - winH / 2)
       : bounds.monY;
 
-    // Image vertical offset inside preview window.
+    // 图片在预览窗口内的垂直偏移
     const cardOffsetInWindow = (bounds.cardCenterY - bounds.monY) / bounds.scale;
     const offsetY = previewUnboundedMode
       ? Math.max(0, (windowCssH - height) / 2)
@@ -361,7 +358,7 @@ const ImagePreview = memo(function ImagePreview({
     timerRef.current = setTimeout(showPreview, hoverPreviewDelay);
   }, [imagePath, imagePreviewEnabled, batchMode, clearTimer, showPreview, hoverPreviewDelay]);
 
-  // Ctrl+Scroll zoom. Coalesce cross-window events to one emit per animation frame.
+  // Ctrl+滚轮缩放，合并跨窗口事件为每帧一次
   const handleWheel = useCallback(
     (e: React.WheelEvent) => {
       if (!e.ctrlKey || !ps.current.visible || !ps.current.bounds) return;
@@ -376,7 +373,7 @@ const ImagePreview = memo(function ImagePreview({
       const step = previewZoomStep / 100;
       const delta = e.deltaY > 0 ? -step : step;
 
-      // Compute base size at scale=1 (same as initial display)
+      // 计算 scale=1 时的基准尺寸
       const { imgNatural } = ps.current;
       let baseW = imgNatural.w;
       let baseH = imgNatural.h;
@@ -401,10 +398,10 @@ const ImagePreview = memo(function ImagePreview({
       const zoomAlign = bounds.side === "left" ? "right" : "left";
       let offsetY = 0;
       if (previewUnboundedMode) {
-        // Keep native window fixed; animate image within it for smooth zoom.
+        // 固定原生窗口，窗口内动画缩放
         offsetY = Math.max(0, (windowCss.h - height) / 2);
       } else {
-        // Recompute vertical offset for bounded mode.
+        // 重算有界模式垂直偏移
         const windowCssH = bounds.maxH / bounds.scale;
         const cardOffsetInWindow = (bounds.cardCenterY - bounds.monY) / bounds.scale;
         offsetY = Math.max(0, Math.min(
@@ -463,7 +460,7 @@ const ImagePreview = memo(function ImagePreview({
     };
   }, [clearTimer]);
 
-  // Calculate height based on cardMaxLines when imageAutoHeight is false
+  // 非自适应模式时按 cardMaxLines 计算高度
   const containerStyle = useMemo(() => {
     if (imageAutoHeight) {
       // 自适应模式：使用用户设置的最大高度
@@ -506,7 +503,7 @@ const ImagePreview = memo(function ImagePreview({
   );
 });
 
-// ============ Image Card (content_type: "image") ============
+// ============ 图片卡片 ============
 
 interface ImageCardProps {
   image_path: string;
@@ -561,7 +558,7 @@ export const ImageCard = memo(function ImageCard({
   );
 });
 
-// ============ File Image Preview (single image file with fallback) ============
+// ============ 文件图片预览（单图片文件，失败回退） ============
 
 const FileImagePreview = memo(function FileImagePreview({
   filePath,
@@ -642,7 +639,7 @@ const FileImagePreview = memo(function FileImagePreview({
   );
 });
 
-// ============ File Content (content_type: "files") ============
+// ============ 文件内容 ============
 
 interface FileContentProps {
   filePaths: string[];

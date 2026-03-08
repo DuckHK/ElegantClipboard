@@ -216,7 +216,7 @@ pub fn set_window_effect(window: tauri::WebviewWindow, effect: String, dark: Opt
 
         if let Err(ref e) = apply_result {
             tracing::warn!("Window effect '{}' not supported on this OS: {}", effect, e);
-            // Restore WS_EX_LAYERED — we may have removed it before the failed attempt
+            // 恢复 WS_EX_LAYERED（应用失败时可能已被移除）
             unsafe {
                 let cur_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
                 if (cur_style as u32) & WS_EX_LAYERED.0 == 0 {

@@ -94,7 +94,7 @@ function App() {
   // 分组下拉状态
   const [groupDropdownOpen, setGroupDropdownOpen] = useState(false);
   const groupDropdownRef = useRef<HTMLDivElement>(null);
-  // 分组对话框输入框 ref（autoFocus 在 Tauri WebView portal 内不稳定，用 ref 代替）
+  // 分组对话框输入框 ref（Tauri WebView 中 autoFocus 不稳定）
   const createInputRef = useRef<HTMLInputElement>(null);
   const renameInputRef = useRef<HTMLInputElement>(null);
 
@@ -103,8 +103,7 @@ function App() {
     fetchGroups();
   }, []);
 
-  // 对话框打开后主动恢复 Tauri 窗口键盘焦点并聚焦输入框
-  // （直接点击分组按钮会触发 debouncedRestoreFocus 释放键盘焦点，需在此重新获取）
+  // 对话框打开后恢复窗口焦点并聚焦输入框
   useEffect(() => {
     if (!createDialogOpen) return;
     const t = setTimeout(async () => {
@@ -123,7 +122,7 @@ function App() {
     return () => clearTimeout(t);
   }, [renameDialogOpen]);
 
-  // 点击外部 / Escape 关闭分组下拉
+  // 点击外部/Escape 关闭分组下拉
   useEffect(() => {
     if (!groupDropdownOpen) return;
     const onPointerDown = (e: MouseEvent) => {
@@ -166,10 +165,10 @@ function App() {
     return () => ro.disconnect();
   }, [updateIndicator]);
 
-  // Reset filters when category bar is hidden.
+  // 分类栏隐藏时重置筛选
   useEffect(() => {
     if (!showCategoryFilter) {
-      // Keep frontend/backend active group in sync when filter bar is hidden.
+      // 同步前后端分组状态
       useClipboardStore.setState({ selectedGroup: null });
       setSelectedGroupId(null);
     }
@@ -246,7 +245,7 @@ function App() {
         setSearchQuery("");
         fetchItems({ search: "" });
       } else if (clipboardDirtyRef.current) {
-        // 有变化时重新获取以更新 files_valid
+        // 有变化时刷新以更新 files_valid
         refresh();
       }
       clipboardDirtyRef.current = false;
@@ -281,7 +280,7 @@ function App() {
     };
   }, [resetView, autoResetState]);
 
-  // ESC 键处理：后端钩子 + DOM 监听双通道
+  // ESC 键处理（后端钩子 + DOM 双通道）
   const handleEscape = useCallback(async () => {
     if (dismissOverlays()) return;
     if (useClipboardStore.getState().batchMode) {
@@ -301,7 +300,7 @@ function App() {
     return () => { unlisten.then((fn) => fn()); };
   }, [handleEscape]);
 
-  // 通道2：DOM 键盘事件
+  // DOM 键盘事件通道
   useEffect(() => {
     const onKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape" && e.isTrusted) {

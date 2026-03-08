@@ -21,7 +21,7 @@ pub fn get_clipboard_source_app() -> Option<SourceAppInfo> {
 
     let self_pid = std::process::id();
 
-    // 从 HWND 解析完整来源信息，失败或属于自身则返回 None
+    // 从 HWND 解析来源应用，失败或属于自身返回 None
     unsafe fn try_resolve(hwnd: HWND, self_pid: u32) -> Option<SourceAppInfo> {
         if hwnd.0.is_null() {
             return None;
@@ -382,7 +382,7 @@ fn extract_icon_png(exe_path: &str) -> Option<Vec<u8>> {
             return None;
         }
 
-        // BGRA → RGBA → PNG
+        // BGRA → RGBA 转换
         for chunk in pixels.chunks_exact_mut(4) {
             chunk.swap(0, 2);
         }

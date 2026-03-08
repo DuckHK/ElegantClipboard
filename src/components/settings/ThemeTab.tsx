@@ -18,7 +18,7 @@ export function ThemeTab() {
   const { colorTheme, setColorTheme, sharpCorners, setSharpCorners, darkMode, setDarkMode, windowEffect, setWindowEffect } = useUISettings();
   const [systemAccentColor, setSystemAccentColor] = useState(getAccentColor);
 
-  // Re-render when accent color changes
+  // 强调色变化时重新渲染
   useEffect(() => subscribeAccentColor(setSystemAccentColor), []);
 
   const themes: {

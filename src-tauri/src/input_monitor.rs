@@ -199,8 +199,7 @@ pub fn focus_clipboard_window(window: &tauri::WebviewWindow) {
 /// 恢复非聚焦模式并还原之前的前台窗口（搜索框 blur 时调用）。
 #[cfg(windows)]
 pub fn restore_last_focus(_window: &tauri::WebviewWindow) {
-    // 不调用 set_focusable(false)，保持窗口激活状态以维持 DWM 特效
-    // 只还原之前的前台窗口，让键盘输入回到原来的应用
+    // 保持窗口激活以维持 DWM 特效，仅还原前台窗口
     let raw = PREV_FOREGROUND_HWND.load(Ordering::Relaxed);
     if raw != 0 {
         let hwnd = HWND(raw as *mut _);
@@ -212,7 +211,7 @@ pub fn restore_last_focus(_window: &tauri::WebviewWindow) {
 
 #[cfg(not(windows))]
 pub fn restore_last_focus(window: &tauri::WebviewWindow) {
-    // 非 Windows 平台保持原逻辑
+    // 非 Windows 平台回退逻辑
     let _ = window.set_focusable(false);
 }
 
@@ -324,7 +323,7 @@ unsafe extern "system" fn mouse_hook_proc(code: i32, wparam: WPARAM, lparam: LPA
                     }
             }
             v if v == WM_LBUTTONDOWN || v == WM_RBUTTONDOWN => {
-                // 用点击事件自身的坐标更新光标位置，确保 bounds check 精确
+                // 用点击坐标更新光标位置，确保边界检查精确
                 if let Some(info) = unsafe { (lparam.0 as *const MSLLHOOKSTRUCT).as_ref() } {
                     CURSOR_X.store(info.pt.x as i64, Ordering::Relaxed);
                     CURSOR_Y.store(info.pt.y as i64, Ordering::Relaxed);
@@ -353,8 +352,7 @@ unsafe extern "system" fn keyboard_hook_proc(
                 handle_escape_key();
             }
 
-            // 键盘导航：捕获方向键/Enter/Delete，通过 Tauri 事件转发给前端，
-            // 避免窗口抢焦点导致目标应用弹窗/下拉消失。
+            // 键盘导航：捕获方向键/Enter/Delete 转发前端，避免抢焦点
             if KEYBOARD_NAV_ENABLED.load(Ordering::Relaxed) && (is_keydown || is_keyup) {
                 // 若本窗口已是前台（如搜索框聚焦），让按键正常走 DOM 路径
                 let main_raw = MAIN_HWND.load(Ordering::Relaxed);
@@ -484,8 +482,7 @@ fn handle_click_outside() {
             let _ = window.set_focusable(false);
             let _ = window.hide();
             crate::keyboard_hook::set_window_state(crate::keyboard_hook::WindowState::Hidden);
-            // disable_mouse_monitoring 会向本线程投递 MSG_UNINSTALL_KB_HOOK，
-            // 该消息将在当前钩子回调返回后的下一次消息循环中处理
+            // disable_mouse_monitoring 投递卸载钩子消息，下次消息循环处理
             disable_mouse_monitoring();
             crate::commands::hide_preview_windows(window.app_handle());
             let _ = window.emit("window-hidden", ());

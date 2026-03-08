@@ -143,7 +143,7 @@ pub async fn show_text_preview(
     }));
 
     let _ = window.set_always_on_top(true);
-    // 文本预览点击穿透；滚动由主窗口 Ctrl+滚轮驱动
+    // 点击穿透，滚动由主窗口 Ctrl+滚轮驱动
     let _ = window.set_ignore_cursor_events(true);
 
     let update_payload = serde_json::json!({
@@ -242,7 +242,7 @@ fn apply_preview_window_effect(window: &tauri::WebviewWindow, effect: Option<&st
     let Ok(raw_hwnd) = window.hwnd() else { return };
     let hwnd = HWND(raw_hwnd.0 as *mut _);
 
-    // 移除 WS_EX_LAYERED 以支持合成特效渲染
+    // 移除 WS_EX_LAYERED 支持合成特效
     unsafe {
         let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
         if (ex_style as u32) & WS_EX_LAYERED.0 != 0 {
