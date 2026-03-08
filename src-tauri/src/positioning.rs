@@ -24,15 +24,6 @@ impl PositionMode {
             _ => Self::FollowCursor,
         }
     }
-
-    #[allow(dead_code)]
-    pub fn as_str(&self) -> &'static str {
-        match self {
-            Self::FollowCursor => "follow_cursor",
-            Self::ScreenCenter => "screen_center",
-            Self::FixedPosition => "fixed_position",
-        }
-    }
 }
 
 #[cfg(target_os = "windows")]

@@ -55,15 +55,19 @@ pub(crate) fn toggle_window_visibility(app: &tauri::AppHandle) {
                     }
                     // position_mode 优先；未设置时回退到旧版 follow_cursor
                     if let Some(mode_str) = repo.get("position_mode").ok().flatten() {
-                        crate::positioning::PositionMode::from_str(&mode_str)
+                        let mode = crate::positioning::PositionMode::from_str(&mode_str);
+                        tracing::debug!("定位模式: {:?} (from position_mode='{}')", mode, mode_str);
+                        mode
                     } else {
                         let follow = repo.get("follow_cursor").ok().flatten()
                             .map(|v| v != "false").unwrap_or(true);
-                        if follow {
+                        let mode = if follow {
                             crate::positioning::PositionMode::FollowCursor
                         } else {
                             crate::positioning::PositionMode::FixedPosition
-                        }
+                        };
+                        tracing::debug!("定位模式: {:?} (legacy fallback, follow_cursor={})", mode, follow);
+                        mode
                     }
                 })
                 .unwrap_or(crate::positioning::PositionMode::FollowCursor);
