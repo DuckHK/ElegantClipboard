@@ -86,3 +86,20 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: --target ${{ matrix.rust-target }}
+
+      - name: Rename portable exe
+        shell: pwsh
+        run: |
+          $v = "${{ steps.version.outputs.VERSION }}"
+          $arch = "${{ matrix.arch }}"
+          $src = "src-tauri/target/${{ matrix.rust-target }}/release/elegant-clipboard.exe"
+          Copy-Item $src "ElegantClipboard_${v}_${arch}_portable.exe"
+
+      - name: Upload portable to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          draft: true
+          files: ElegantClipboard_*_portable.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

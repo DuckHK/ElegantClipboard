@@ -32,7 +32,7 @@ type ShortcutEditTarget =
 const QUICK_PASTE_SLOT_COUNT = 9;
 const QUICK_PASTE_EMPTY_LABEL = "点击设置快捷键";
 
-/** Maps KeyboardEvent.code to shortcut key name (extracted to avoid per-keydown allocation) */
+/** KeyboardEvent.code 到快捷键名称的映射 */
 const KEY_CODE_MAP: Record<string, string> = {
   Space: "Space",
   Tab: "Tab",
@@ -69,7 +69,7 @@ export function ShortcutsTab({
     "enable" | "disable" | null
   >(null);
 
-  // Shortcut editing state
+  // 快捷键编辑状态
   const [shortcutDialogOpen, setShortcutDialogOpen] = useState(false);
   const [recordingShortcut, setRecordingShortcut] = useState(false);
   const [tempShortcut, setTempShortcut] = useState("");
@@ -81,20 +81,20 @@ export function ShortcutsTab({
   const [slotErrors, setSlotErrors] = useState<Record<number, string>>({});
   const [quickPasteExpanded, setQuickPasteExpanded] = useState(false);
 
-  // Handle keyboard event for shortcut recording
+  // 处理快捷键录入的键盘事件
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
     const parts: string[] = [];
 
-    // Modifiers
+    // 修饰键
     if (e.ctrlKey) parts.push("Ctrl");
     if (e.altKey) parts.push("Alt");
     if (e.shiftKey) parts.push("Shift");
     if (e.metaKey) parts.push("Win");
 
-    // Key
+    // 按键
     let key = "";
     if (e.code.startsWith("Key")) {
       key = e.code.replace("Key", "");
@@ -107,7 +107,7 @@ export function ShortcutsTab({
     }
 
     if (key && parts.length > 0) {
-      // Shift alone is not a valid modifier for global shortcuts
+      // Shift 不能单独作为全局快捷键修饰键
       const hasNonShiftModifier = e.ctrlKey || e.altKey || e.metaKey;
       if (!hasNonShiftModifier) {
         setShortcutError("Shift 不能单独作为修饰键，请配合 Ctrl/Alt 使用");
@@ -122,14 +122,14 @@ export function ShortcutsTab({
       setTempShortcut(parts.join("+"));
       setShortcutError("");
     } else if (!key && parts.length > 0) {
-      // Only modifiers pressed, show hint
+      // 仅按了修饰键，显示提示
       setTempShortcut(parts.join("+") + "+...");
     } else if (key && parts.length === 0) {
       setShortcutError("请至少使用一个修饰键 (Ctrl/Alt)");
     }
   }, []);
 
-  // Start/stop recording
+  // 开始/停止录入
   useEffect(() => {
     if (recordingShortcut) {
       window.addEventListener("keydown", handleKeyDown);
@@ -181,20 +181,20 @@ export function ShortcutsTab({
     setEditTarget(null);
   };
 
-  // Normalize shortcut string for comparison (order-insensitive)
+  // 标准化快捷键字符串用于比较（顺序无关）
   const normalizeForCompare = (s: string) => s.toLowerCase().split("+").sort().join("+");
 
-  // The actually active main shortcut (Win+V when replacement is on)
+  // 当前生效的主快捷键（Win+V 替换开启时为 Win+V）
   const activeMainShortcut = settings.winv_replacement ? "Win+V" : settings.shortcut;
 
-  // Detect shortcut conflicts with main shortcut and other quick-paste slots
+  // 检测快捷键冲突
   const detectConflict = (shortcut: string, target: ShortcutEditTarget): string | null => {
     const normalized = normalizeForCompare(shortcut);
-    // Check against active main shortcut
+    // 与主快捷键比较
     if (target.type === "quick-paste" && normalized === normalizeForCompare(activeMainShortcut)) {
       return `与呼出快捷键 ${activeMainShortcut} 冲突`;
     }
-    // Check against quick-paste slots (skip self when editing a slot)
+    // 与快速粘贴槽位比较（编辑时跳过自身）
     for (let i = 0; i < quickPasteShortcuts.length; i++) {
       const s = quickPasteShortcuts[i];
       if (!s) continue;
@@ -206,7 +206,7 @@ export function ShortcutsTab({
     return null;
   };
 
-  // Common helper: invoke backend to set a slot's shortcut and update local state
+  // 调用后端设置槽位快捷键并更新本地状态
   const applySlotShortcut = async (idx: number, shortcut: string) => {
     setLoadingSlot(idx);
     setSlotErrors((prev) => { const { [idx]: _, ...rest } = prev; return rest; });
@@ -229,7 +229,7 @@ export function ShortcutsTab({
       return;
     }
 
-    // Conflict detection
+    // 冲突检测
     const conflict = detectConflict(tempShortcut, editTarget);
     if (conflict) {
       setShortcutError(conflict);
@@ -297,7 +297,7 @@ export function ShortcutsTab({
     setLoadingSlot(null);
   };
 
-  // Execute Win+V toggle after user confirms
+  // 用户确认后执行 Win+V 切换
   const executeWinvToggle = async () => {
     if (!winvPendingAction) return;
 

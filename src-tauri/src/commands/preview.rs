@@ -1,7 +1,7 @@
 use crate::config::AppConfig;
 use tauri::{Emitter, Manager};
 
-/// Monotonic sequence for text-preview updates; used to cancel stale delayed retries.
+/// 文本预览更新序列号，用于取消过期的延迟重试
 pub(crate) static TEXT_PREVIEW_UPDATE_SEQ: std::sync::atomic::AtomicU64 =
     std::sync::atomic::AtomicU64::new(0);
 
@@ -61,7 +61,7 @@ pub async fn show_image_preview(
     }
 
     let _ = window.set_always_on_top(true);
-    // Make transparent areas click-through so screenshot tools won't detect the window
+    // 透明区域点击穿透，避免截图工具捕获
     let _ = window.set_ignore_cursor_events(true);
 
     let _ = window.emit(
@@ -76,6 +76,8 @@ pub async fn show_image_preview(
     );
 
     let _ = window.show();
+    crate::positioning::force_topmost(&window);
+    tracing::debug!("image-preview shown at ({}, {}), size {}x{}, created={}", win_x, win_y, win_width, win_height, newly_created);
     Ok(())
 }
 
@@ -84,6 +86,7 @@ pub async fn hide_image_preview(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("image-preview") {
         let _ = window.hide();
         let _ = window.emit("image-preview-clear", ());
+        tracing::debug!("image-preview hidden");
     }
 }
 
@@ -99,6 +102,7 @@ pub async fn show_text_preview(
     align: Option<String>,
     theme: Option<String>,
     sharp_corners: Option<bool>,
+    window_effect: Option<String>,
 ) -> Result<(), String> {
     let seq = TEXT_PREVIEW_UPDATE_SEQ.fetch_add(1, std::sync::atomic::Ordering::AcqRel) + 1;
     let mut newly_created = false;
@@ -106,7 +110,7 @@ pub async fn show_text_preview(
         w
     } else {
         newly_created = true;
-        tauri::WebviewWindowBuilder::new(
+        let w = tauri::WebviewWindowBuilder::new(
             &app,
             "text-preview",
             tauri::WebviewUrl::App("/text-preview.html".into()),
@@ -121,7 +125,12 @@ pub async fn show_text_preview(
         .focused(false)
         .visible(false)
         .build()
-        .map_err(|e| format!("创建文本预览窗口失败: {}", e))?
+        .map_err(|e| format!("创建文本预览窗口失败: {}", e))?;
+
+        // 应用窗口特效，与主窗口保持一致
+        apply_preview_window_effect(&w, window_effect.as_deref());
+
+        w
     };
 
     let _ = window.set_size(tauri::Size::Physical(tauri::PhysicalSize {
@@ -134,7 +143,7 @@ pub async fn show_text_preview(
     }));
 
     let _ = window.set_always_on_top(true);
-    // Keep text preview click-through; scrolling is driven from main window with Ctrl+Wheel.
+    // 点击穿透，滚动由主窗口 Ctrl+滚轮驱动
     let _ = window.set_ignore_cursor_events(true);
 
     let update_payload = serde_json::json!({
@@ -145,6 +154,8 @@ pub async fn show_text_preview(
     });
     let _ = window.emit("text-preview-update", update_payload.clone());
     let _ = window.show();
+    crate::positioning::force_topmost(&window);
+    tracing::debug!("text-preview shown at ({}, {}), size {}x{}, created={}", win_x, win_y, win_width, win_height, newly_created);
 
     if newly_created {
         let window_clone = window.clone();
@@ -168,6 +179,7 @@ pub async fn hide_text_preview(app: tauri::AppHandle) {
     if let Some(window) = app.get_webview_window("text-preview") {
         let _ = window.hide();
         let _ = window.emit("text-preview-clear", ());
+        tracing::debug!("text-preview hidden");
     }
 }
 
@@ -212,6 +224,50 @@ pub async fn open_settings_window(app: tauri::AppHandle) -> Result<(), String> {
 pub fn is_log_to_file_enabled() -> bool {
     AppConfig::load().is_log_to_file()
 }
+
+/// 为预览窗口应用系统级窗口特效（Acrylic/Mica/Tabbed）
+#[cfg(target_os = "windows")]
+fn apply_preview_window_effect(window: &tauri::WebviewWindow, effect: Option<&str>) {
+    use windows::Win32::Foundation::HWND;
+    use windows::Win32::UI::WindowsAndMessaging::{
+        GetWindowLongW, SetWindowLongW, SetWindowPos, GWL_EXSTYLE, WS_EX_LAYERED,
+        SWP_FRAMECHANGED, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+    };
+
+    let effect = match effect {
+        Some(e) if e != "none" => e,
+        _ => return,
+    };
+
+    let Ok(raw_hwnd) = window.hwnd() else { return };
+    let hwnd = HWND(raw_hwnd.0 as *mut _);
+
+    // 移除 WS_EX_LAYERED 支持合成特效
+    unsafe {
+        let ex_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
+        if (ex_style as u32) & WS_EX_LAYERED.0 != 0 {
+            SetWindowLongW(hwnd, GWL_EXSTYLE, ((ex_style as u32) & !WS_EX_LAYERED.0) as i32);
+            let _ = SetWindowPos(
+                hwnd, None, 0, 0, 0, 0,
+                SWP_NOMOVE | SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_FRAMECHANGED,
+            );
+        }
+    }
+
+    let result = match effect {
+        "mica" => window_vibrancy::apply_mica(window, None),
+        "acrylic" => window_vibrancy::apply_acrylic(window, Some((0, 0, 0, 0))),
+        "tabbed" => window_vibrancy::apply_tabbed(window, None),
+        _ => return,
+    };
+
+    if let Err(e) = result {
+        tracing::debug!("Preview window effect '{}' failed: {}", effect, e);
+    }
+}
+
+#[cfg(not(target_os = "windows"))]
+fn apply_preview_window_effect(_window: &tauri::WebviewWindow, _effect: Option<&str>) {}
 
 #[tauri::command]
 pub fn set_log_to_file(enabled: bool) -> Result<(), String> {

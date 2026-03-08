@@ -111,8 +111,7 @@ static RESUME_TX: std::sync::LazyLock<std::sync::mpsc::Sender<crate::clipboard::
                     };
                     let mut pending = vec![first];
 
-                    // Debounce resume requests: wait for a quiet 500ms window,
-                    // then flush all pending resumes together.
+                    // 防抖恢复请求：等待 500ms 静默期后批量处理
                     loop {
                         match rx.recv_timeout(std::time::Duration::from_millis(500)) {
                             Ok(monitor) => pending.push(monitor),

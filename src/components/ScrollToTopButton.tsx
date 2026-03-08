@@ -80,7 +80,7 @@ export function ScrollToTopButton({ visible, onScrollToTop }: ScrollToTopButtonP
       saveAnchor(newAnchor);
     }
     drag.current = null;
-    // snapping 动画结束后清除 dragOffset
+    // 吸附动画结束后清除拖拽偏移
     setTimeout(() => { setDragOffset(null); setSnapping(false); }, 300);
   };
 

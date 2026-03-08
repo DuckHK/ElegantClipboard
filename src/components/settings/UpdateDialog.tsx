@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { formatSize } from "@/lib/format";
 
-// ── Types ──
+// ── 类型定义 ──
 
 interface UpdateInfo {
   has_update: boolean;
@@ -45,7 +45,7 @@ type UpdateStatus =
   | "installing"
   | "error";
 
-// ── UpdateDialog ──
+// ── 更新对话框 ──
 
 interface UpdateDialogProps {
   open: boolean;
@@ -76,7 +76,7 @@ export function UpdateDialog({ open, onOpenChange }: UpdateDialogProps) {
     }
   }, []);
 
-  // Check for update when dialog opens; reset when closed
+  // 对话框打开时检查更新，关闭时重置
   useEffect(() => {
     if (open) {
       checkUpdate();
@@ -89,7 +89,7 @@ export function UpdateDialog({ open, onOpenChange }: UpdateDialogProps) {
     }
   }, [open, checkUpdate]);
 
-  // Listen for download progress events
+  // 监听下载进度事件
   useEffect(() => {
     if (status !== "downloading") return;
     const unlisten = listen<DownloadProgress>(
@@ -152,7 +152,7 @@ export function UpdateDialog({ open, onOpenChange }: UpdateDialogProps) {
       ? Math.round((progress.downloaded / progress.total) * 100)
       : 0;
 
-  // Prevent closing during download or install
+  // 下载或安装期间禁止关闭
   const handleOpenChange = (newOpen: boolean) => {
     if (!newOpen && (status === "downloading" || status === "installing"))
       return;
@@ -276,13 +276,13 @@ export function UpdateDialog({ open, onOpenChange }: UpdateDialogProps) {
   );
 }
 
-// ── Simple Markdown Renderer ──
+// ── 简易 Markdown 渲染器 ──
 
-/** Convert a subset of Markdown (headings, lists, bold, links) to HTML. */
+/** 将 Markdown 子集（标题、列表、粗体、链接）转为 HTML */
 function mdToHtml(md: string): string {
   return md
     .split("\n")
-    .filter((l) => !l.trim().startsWith("<")) // strip raw HTML (e.g. <img>)
+    .filter((l) => !l.trim().startsWith("<")) // 移除原始 HTML 标签
     .join("\n")
     .replace(/^### (.+)$/gm, '<h4 class="font-medium text-xs mt-3 mb-1 text-foreground">$1</h4>')
     .replace(/^## (.+)$/gm, '<h3 class="font-semibold text-sm mt-3 mb-1 text-foreground">$1</h3>')

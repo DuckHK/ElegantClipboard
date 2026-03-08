@@ -160,7 +160,7 @@ fn apply_quick_paste_shortcuts(
 
                     let is_first = {
                         let mut active = ACTIVE_QUICK_PASTE_SLOTS.lock();
-                        active.insert(slot) // true = newly inserted
+                        active.insert(slot) // true = 新插入
                     };
 
                     let state = app.state::<Arc<AppState>>().inner().clone();
@@ -208,12 +208,11 @@ static FILE_LOG_GUARD: parking_lot::Mutex<Option<tracing_appender::non_blocking:
     parking_lot::Mutex::new(None);
 
 fn rotate_log_if_needed(log_path: &std::path::Path, max_size: u64) {
-    if let Ok(meta) = std::fs::metadata(log_path) {
-        if meta.len() > max_size {
+    if let Ok(meta) = std::fs::metadata(log_path)
+        && meta.len() > max_size {
             let backup = log_path.with_extension("log.old");
             let _ = std::fs::rename(log_path, backup);
         }
-    }
 }
 
 fn init_logging(config: &AppConfig) {
@@ -410,11 +409,10 @@ fn set_quick_paste_shortcut(
             return Err("快捷键至少包含一个修饰键 (Ctrl/Alt)".to_string());
         }
     let main_sc = get_current_shortcut();
-        if let Some(main_parsed) = parse_shortcut(&main_sc) {
-            if parsed == main_parsed {
+        if let Some(main_parsed) = parse_shortcut(&main_sc)
+            && parsed == main_parsed {
                 return Err(format!("与呼出快捷键 {} 冲突", main_sc));
             }
-        }
     }
 
     let mut next_shortcuts = {
@@ -450,7 +448,7 @@ pub fn run() {
     let config = AppConfig::load();
     init_logging(&config);
 
-    match wry::webview_version() {
+    match tauri::webview_version() {
         Ok(ver) => tracing::info!("WebView2 runtime version: {}", ver),
         Err(e) => tracing::warn!("WebView2 version query failed: {}", e),
     }
@@ -580,9 +578,7 @@ pub fn run() {
 
                 #[cfg(target_os = "windows")]
                 {
-                    // Ensure WS_EX_LAYERED is set at startup so the window is
-                    // opaque before initTheme() runs. This prevents a transparent
-                    // flash on Windows 10 where DWM effects are not supported.
+                    // 启动时设置 WS_EX_LAYERED 确保窗口不透明，防止 Win10 无 DWM 特效时闪烁
                     {
                         use windows::Win32::Foundation::HWND;
                         use windows::Win32::UI::WindowsAndMessaging::{
@@ -754,7 +750,9 @@ pub fn run() {
             commands::clipboard::paste_content,
             commands::clipboard::paste_content_as_plain,
             commands::clipboard::paste_text_direct,
+            commands::clipboard::merge_paste_content,
             commands::clipboard::update_text_content,
+            commands::settings::get_running_apps,
             commands::settings::get_setting,
             commands::settings::set_setting,
             commands::settings::get_all_settings,
@@ -767,6 +765,7 @@ pub fn run() {
             commands::settings::reset_all_data,
             commands::settings::select_folder_for_settings,
             commands::settings::open_data_folder,
+            commands::settings::is_portable_mode,
             commands::settings::is_autostart_enabled,
             commands::settings::enable_autostart,
             commands::settings::disable_autostart,

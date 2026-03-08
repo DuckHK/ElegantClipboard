@@ -102,7 +102,7 @@ impl ClipboardMonitor {
         self.running.store(false, Ordering::SeqCst);
         info!("Clipboard monitor stopping");
 
-        // 等待线程退出（运行标志已置 false，线程应自行停止）
+        // 等待线程退出
         if let Some(handle) = self.thread_handle.lock().take() {
             let _ = handle.join();
         }
@@ -183,6 +183,13 @@ impl CMHandler for MonitorHandler {
         // 先获取来源应用（在读取内容之前）
         let source = super::source_app::get_clipboard_source_app();
 
+        // 检查来源应用是否在排除列表中
+        if let Some(ref handler) = *self.handler.lock()
+            && handler.is_source_app_excluded(&source) {
+                debug!("Clipboard change ignored (source app excluded: {:?})", source.as_ref().map(|s| &s.app_name));
+                return CallbackResult::Next;
+            }
+
         // 读取剪贴板内容（带重试，应对剪贴板锁竞争）
         let content = match read_clipboard_content_with_retry() {
             Some(c) => c,
@@ -192,8 +199,12 @@ impl CMHandler for MonitorHandler {
         // 读取当前活动分组
         let group_id = *self.active_group_id.lock();
 
-        // 处理内容
+        // 检查内容类型 + 处理内容（单次加锁）
         if let Some(ref handler) = *self.handler.lock() {
+            if !handler.is_content_type_allowed(&content) {
+                debug!("Clipboard change ignored (content type not allowed)");
+                return CallbackResult::Next;
+            }
             match handler.process(content, source, group_id) {
                 Ok(Some(id)) => {
                     debug!("Processed clipboard item: {}", id);
@@ -284,7 +295,33 @@ fn read_clipboard_content() -> Option<ClipboardContent> {
         Err(e) => debug!("Clipboard get_image failed: {} (may not contain image data or format unsupported)", e),
     }
 
-    // 尝试获取文本
+    // 尝试获取 HTML
+    if ctx.has(clipboard_rs::ContentFormat::Html) {
+        match ctx.get_html() {
+            Ok(html) if !html.is_empty() => {
+                let text = ctx.get_text().ok().filter(|t| !t.is_empty());
+                debug!("Got HTML from clipboard: {} bytes", html.len());
+                return Some(ClipboardContent::Html { html, text });
+            }
+            Ok(_) => {}
+            Err(e) => debug!("Clipboard get_html failed: {}", e),
+        }
+    }
+
+    // 尝试获取 RTF 富文本
+    if ctx.has(clipboard_rs::ContentFormat::Rtf) {
+        match ctx.get_rich_text() {
+            Ok(rtf) if !rtf.is_empty() => {
+                let text = ctx.get_text().ok().filter(|t| !t.is_empty());
+                debug!("Got RTF from clipboard: {} bytes", rtf.len());
+                return Some(ClipboardContent::Rtf { rtf, text });
+            }
+            Ok(_) => {}
+            Err(e) => debug!("Clipboard get_rich_text failed: {}", e),
+        }
+    }
+
+    // 尝试获取纯文本
     match arboard::Clipboard::new() {
         Ok(mut clipboard) => match clipboard.get_text() {
             Ok(text) if !text.is_empty() => {

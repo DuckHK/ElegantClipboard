@@ -9,16 +9,14 @@ pub(crate) fn save_window_size_if_enabled<R: tauri::Runtime>(app: &tauri::AppHan
         let settings_repo = database::SettingsRepository::new(&state.db);
         let persist = settings_repo.get("persist_window_size").ok().flatten()
             .map(|v| v != "false").unwrap_or(true);
-        if persist {
-            if let Ok(size) = window.inner_size() {
-                if let Ok(scale) = window.scale_factor() {
+        if persist
+            && let Ok(size) = window.inner_size()
+                && let Ok(scale) = window.scale_factor() {
                     let w = (size.width as f64 / scale).round() as u32;
                     let h = (size.height as f64 / scale).round() as u32;
                     let _ = settings_repo.set("window_width", &w.to_string());
                     let _ = settings_repo.set("window_height", &h.to_string());
                 }
-            }
-        }
     }
 }
 
@@ -35,7 +33,7 @@ pub(crate) fn toggle_window_visibility(app: &tauri::AppHandle) {
             crate::commands::hide_preview_windows(app);
             let _ = window.emit("window-hidden", ());
         } else {
-            let follow_cursor = app
+            let position_mode = app
                 .try_state::<std::sync::Arc<AppState>>()
                 .map(|state| {
                     let repo = database::SettingsRepository::new(&state.db);
@@ -53,15 +51,27 @@ pub(crate) fn toggle_window_visibility(app: &tauri::AppHandle) {
                             }));
                         }
                     }
-                    repo.get("follow_cursor").ok().flatten()
-                        .map(|v| v != "false").unwrap_or(true)
+                    // position_mode 优先；未设置时回退到旧版 follow_cursor
+                    if let Some(mode_str) = repo.get("position_mode").ok().flatten() {
+                        let mode = crate::positioning::PositionMode::from_str(&mode_str);
+                        tracing::debug!("定位模式: {:?} (from position_mode='{}')", mode, mode_str);
+                        mode
+                    } else {
+                        let follow = repo.get("follow_cursor").ok().flatten()
+                            .map(|v| v != "false").unwrap_or(true);
+                        let mode = if follow {
+                            crate::positioning::PositionMode::FollowCursor
+                        } else {
+                            crate::positioning::PositionMode::FixedPosition
+                        };
+                        tracing::debug!("定位模式: {:?} (legacy fallback, follow_cursor={})", mode, follow);
+                        mode
+                    }
                 })
-                .unwrap_or(true);
+                .unwrap_or(crate::positioning::PositionMode::FollowCursor);
 
-            if follow_cursor {
-                if let Err(e) = crate::positioning::position_at_cursor(&window) {
-                    tracing::warn!("定位窗口失败: {}", e);
-                }
+            if let Err(e) = crate::positioning::position_window(&window, position_mode) {
+                tracing::warn!("定位窗口失败: {}", e);
             }
 
             crate::input_monitor::save_current_focus();
@@ -206,7 +216,7 @@ pub fn set_window_effect(window: tauri::WebviewWindow, effect: String, dark: Opt
 
         if let Err(ref e) = apply_result {
             tracing::warn!("Window effect '{}' not supported on this OS: {}", effect, e);
-            // Restore WS_EX_LAYERED — we may have removed it before the failed attempt
+            // 恢复 WS_EX_LAYERED（应用失败时可能已被移除）
             unsafe {
                 let cur_style = GetWindowLongW(hwnd, GWL_EXSTYLE);
                 if (cur_style as u32) & WS_EX_LAYERED.0 == 0 {

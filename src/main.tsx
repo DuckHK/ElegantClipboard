@@ -7,28 +7,27 @@ import { TextEditor } from "./pages/TextEditor";
 import "overlayscrollbars/overlayscrollbars.css";
 import "./index.css";
 
-// Disable context menu (right-click)
+// 禁用右键菜单
 document.addEventListener("contextmenu", (e) => {
   e.preventDefault();
 });
 
-// Disable WebView2 browser shortcuts that leak through to desktop apps
+// 禁用 WebView2 浏览器快捷键
 document.addEventListener("keydown", (e) => {
-  // Block Ctrl+letter browser shortcuts (Ctrl+R/F/S/P/etc.)
-  // Only target single-letter keys so Ctrl+Backspace, Ctrl+Arrow etc. still work
+  // 拦截 Ctrl+字母浏览器快捷键，保留 Ctrl+Backspace/Arrow 等
   if (e.ctrlKey && !e.altKey && e.key.length === 1) {
     const allowed = new Set(["a", "c", "v", "x", "z", "y"]);
     if (!allowed.has(e.key.toLowerCase())) {
       e.preventDefault();
     }
   }
-  // Block Tab navigation, F5 refresh, F7 caret browsing
+  // 拦截 Tab 导航、F5 刷新、F7 光标浏览
   if (e.key === "Tab" || e.key === "F5" || e.key === "F7") {
     e.preventDefault();
   }
 });
 
-// Simple router based on URL path
+// 基于 URL 路径的简单路由
 function Router() {
   const path = window.location.pathname;
   

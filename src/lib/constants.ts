@@ -1,6 +1,6 @@
 import type { ToolbarButton } from "@/stores/ui-settings";
 
-/** Toolbar button registry — defines all available toolbar buttons */
+/** 工具栏按钮注册表 */
 export const TOOLBAR_BUTTON_REGISTRY: Record<
   ToolbarButton,
   { label: string; description: string }
@@ -11,7 +11,7 @@ export const TOOLBAR_BUTTON_REGISTRY: Record<
   settings: { label: "设置", description: "打开设置窗口" },
 };
 
-/** Category groups — shared between App segment tabs and ClipboardList keyboard navigation */
+/** 分类分组（App 标签页和键盘导航共用） */
 export const GROUPS = [
   { label: "全部", value: null },
   { label: "收藏", value: "__favorites__" },

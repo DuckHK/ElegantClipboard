@@ -286,8 +286,8 @@ impl ClipboardRepository {
         let mut params_vec: Vec<Box<dyn rusqlite::ToSql>> = Vec::new();
 
         // LIKE 搜索（支持中文，匹配全文任意位置）
-        if let Some(ref search) = options.search {
-            if !search.is_empty() {
+        if let Some(ref search) = options.search
+            && !search.is_empty() {
                 conditions.push(
                     "(text_content LIKE ? ESCAPE '\\' OR file_paths LIKE ? ESCAPE '\\')"
                         .to_string(),
@@ -302,9 +302,8 @@ impl ClipboardRepository {
                 params_vec.push(Box::new(pattern.clone()));
                 params_vec.push(Box::new(pattern));
             }
-        }
 
-        // 支持逗号分隔的多类型筛选（如 "text,html,rtf"）
+        // 多类型筛选（逗号分隔）
         Self::append_content_type_condition(
             options.content_type.as_deref(),
             &mut conditions,
@@ -392,7 +391,7 @@ impl ClipboardRepository {
         let (conditions, mut params_vec) = Self::build_filter_conditions(&options);
         Self::append_where(&mut sql, &conditions);
 
-        // 排序: 置顶优先 → sort_order 降序 → 时间降序
+        // 排序：置顶优先 → sort_order 降序 → 时间降序
         sql.push_str(" ORDER BY is_pinned DESC, sort_order DESC, created_at DESC");
 
         if let Some(limit) = options.limit {
@@ -692,7 +691,7 @@ impl ClipboardRepository {
         hasher.update(new_text.as_bytes());
         let content_hash = hasher.finalize().to_hex().to_string();
 
-        // 清除 html/rtf 内容并降级为 text 类型（纯文本编辑后格式内容失效）
+        // 降级为 text 类型，清除 html/rtf 内容
         conn.execute(
             "UPDATE clipboard_items SET text_content = ?1, preview = ?2, content_hash = ?3, \
              byte_size = ?4, char_count = ?5, content_type = 'text', \
@@ -745,7 +744,7 @@ impl ClipboardRepository {
             |row| row.get(0),
         )?;
 
-        // 使用事务保护两条 UPDATE 的原子性，防止中途失败导致 sort_order 数据损坏
+        // 事务保护原子性
         let tx = conn.unchecked_transaction()?;
 
         tx.execute(

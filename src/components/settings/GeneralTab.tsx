@@ -10,15 +10,19 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { logError } from "@/lib/logger";
 import { useUISettings } from "@/stores/ui-settings";
+
+export type PositionMode = "follow_cursor" | "screen_center" | "fixed_position";
 
 export interface GeneralSettings {
   auto_start: boolean;
   admin_launch: boolean;
   is_running_as_admin: boolean;
-  follow_cursor: boolean;
+  is_portable: boolean;
+  position_mode: PositionMode;
   log_to_file: boolean;
   log_file_path: string;
 }
@@ -48,6 +52,7 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
   const [persistWindowSize, setPersistWindowSize] = useState(true);
   const [autoCheckUpdate, setAutoCheckUpdate] = useState(true);
 
+
   useEffect(() => {
     invoke<string | null>("get_setting", { key: "persist_window_size" })
       .then((v) => setPersistWindowSize(v !== "false"))
@@ -56,6 +61,15 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
       .then((v) => setAutoCheckUpdate(v !== "false"))
       .catch(() => {});
   }, []);
+
+  const changePositionMode = async (mode: PositionMode) => {
+    onSettingsChange({ ...settings, position_mode: mode });
+    try {
+      await invoke("set_setting", { key: "position_mode", value: mode });
+    } catch (error) {
+      logError("Failed to save position_mode:", error);
+    }
+  };
 
   const togglePersistWindowSize = async (enabled: boolean) => {
     setPersistWindowSize(enabled);
@@ -79,6 +93,8 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
       logError("Failed to save auto_check_update:", error);
     }
   };
+
+
 
   return (
     <>
@@ -144,15 +160,22 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
-                <Label className="text-xs">跟随鼠标</Label>
+                <Label className="text-xs">唤醒位置</Label>
                 <p className="text-xs text-muted-foreground">
-                  窗口显示在鼠标位置附近
+                  窗口唤醒时的定位方式
                 </p>
               </div>
-              <Switch
-                checked={settings.follow_cursor}
-                onCheckedChange={(checked) => onSettingsChange({ ...settings, follow_cursor: checked })}
-              />
+              <Select
+                value={settings.position_mode}
+                onValueChange={(v) => changePositionMode(v as PositionMode)}
+              >
+                <SelectTrigger className="w-[140px] h-8 text-xs"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="follow_cursor">跟随光标</SelectItem>
+                  <SelectItem value="screen_center">屏幕居中</SelectItem>
+                  <SelectItem value="fixed_position">上一次位置</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className="flex items-center justify-between">
               <div className="space-y-0.5">
@@ -248,6 +271,7 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
           </div>
         </div>
 
+
         {/* Log Card */}
         <div className="rounded-lg border bg-card p-4">
           <h3 className="text-sm font-medium mb-3">日志</h3>
@@ -304,7 +328,7 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
               onClick={async () => {
                 if (pendingAdminLaunch !== null) {
                   try {
-                    // Directly save to backend
+                    // 直接保存到后端
                     if (pendingAdminLaunch) {
                       await invoke("enable_admin_launch");
                     } else {
@@ -325,7 +349,7 @@ export function GeneralTab({ settings, onSettingsChange }: GeneralTabProps) {
               onClick={async () => {
                 if (pendingAdminLaunch !== null) {
                   try {
-                    // Directly save to backend before restart
+                    // 重启前保存到后端
                     if (pendingAdminLaunch) {
                       await invoke("enable_admin_launch");
                     } else {

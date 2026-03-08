@@ -9,10 +9,12 @@ import {
   Info16Regular,
   ArrowSync16Regular,
   Speaker216Regular,
+  Filter16Regular,
 } from "@fluentui/react-icons";
 import { invoke } from "@tauri-apps/api/core";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { AboutTab } from "@/components/settings/AboutTab";
+import { AppFilterTab } from "@/components/settings/AppFilterTab";
 import { AudioTab } from "@/components/settings/AudioTab";
 import { DataTab, DataSettings } from "@/components/settings/DataTab";
 import { DisplayTab } from "@/components/settings/DisplayTab";
@@ -32,7 +34,13 @@ import { cn } from "@/lib/utils";
 
 interface AppSettings extends GeneralSettings, ShortcutSettings, DataSettings {}
 
-type TabType = "general" | "display" | "theme" | "data" | "audio" | "shortcuts" | "about";
+const VALID_POSITION_MODES = new Set(["follow_cursor", "screen_center", "fixed_position"]);
+function normalizePositionMode(raw: string | null | undefined): import("@/components/settings/GeneralTab").PositionMode {
+  if (raw && VALID_POSITION_MODES.has(raw)) return raw as import("@/components/settings/GeneralTab").PositionMode;
+  return "follow_cursor";
+}
+
+type TabType = "general" | "display" | "theme" | "data" | "appfilter" | "audio" | "shortcuts" | "about";
 
 const navItems: {
   id: TabType;
@@ -43,6 +51,7 @@ const navItems: {
   { id: "display", label: "显示设置", icon: LayoutColumnTwo16Regular },
   { id: "theme", label: "外观主题", icon: Color16Regular },
   { id: "data", label: "数据管理", icon: Database16Regular },
+  { id: "appfilter", label: "监听过滤", icon: Filter16Regular },
   { id: "audio", label: "音效设置", icon: Speaker216Regular },
   { id: "shortcuts", label: "快捷按键", icon: Keyboard16Regular },
   { id: "about", label: "关于软件", icon: Info16Regular },
@@ -59,7 +68,8 @@ export function Settings() {
     auto_start: false,
     admin_launch: false,
     is_running_as_admin: false,
-    follow_cursor: true,
+    is_portable: false,
+    position_mode: "follow_cursor",
     shortcut: "Alt+C",
     winv_replacement: false,
     log_to_file: false,
@@ -92,7 +102,7 @@ export function Settings() {
     });
   }, []);
 
-  // ESC to close settings window
+  // ESC 关闭设置窗口
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
@@ -108,7 +118,7 @@ export function Settings() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  // Auto save when settings change (skip until initial load completes)
+  // 设置变更时自动保存（跳过初始加载）
   useEffect(() => {
     if (!settingsLoadedRef.current) return;
     const timer = setTimeout(() => {
@@ -121,7 +131,6 @@ export function Settings() {
     settings.auto_cleanup_days,
     settings.auto_start,
     settings.admin_launch,
-    settings.follow_cursor,
   ]);
 
   const loadSettings = async () => {
@@ -131,10 +140,11 @@ export function Settings() {
         maxHistoryCount,
         maxContentSize,
         autoCleanupDays,
-        followCursor,
+        positionMode,
         autoStart,
         adminLaunch,
         isRunningAsAdmin,
+        isPortable,
         winvReplacement,
         currentShortcut,
         logToFile,
@@ -144,10 +154,11 @@ export function Settings() {
         invoke<string>("get_setting", { key: "max_history_count" }),
         invoke<string>("get_setting", { key: "max_content_size_kb" }),
         invoke<string>("get_setting", { key: "auto_cleanup_days" }),
-        invoke<string>("get_setting", { key: "follow_cursor" }),
+        invoke<string | null>("get_setting", { key: "position_mode" }),
         invoke<boolean>("is_autostart_enabled"),
         invoke<boolean>("is_admin_launch_enabled"),
         invoke<boolean>("is_running_as_admin"),
+        invoke<boolean>("is_portable_mode"),
         invoke<boolean>("is_winv_replacement_enabled"),
         invoke<string>("get_current_shortcut"),
         invoke<boolean>("is_log_to_file_enabled"),
@@ -162,7 +173,8 @@ export function Settings() {
         auto_start: autoStart,
         admin_launch: adminLaunch,
         is_running_as_admin: isRunningAsAdmin,
-        follow_cursor: followCursor !== "false",
+        is_portable: isPortable,
+        position_mode: normalizePositionMode(positionMode),
         shortcut: currentShortcut || "Alt+C",
         winv_replacement: winvReplacement,
         log_to_file: logToFile,
@@ -176,7 +188,7 @@ export function Settings() {
 
   const saveSettings = async () => {
     try {
-      // Save settings to database (data_path is handled separately by GeneralTab with migration)
+      // 保存设置到数据库（data_path 由 GeneralTab 单独处理迁移）
       await invoke("set_setting", {
         key: "max_history_count",
         value: settings.max_history_count.toString(),
@@ -189,18 +201,13 @@ export function Settings() {
         key: "auto_cleanup_days",
         value: settings.auto_cleanup_days.toString(),
       });
-      await invoke("set_setting", {
-        key: "follow_cursor",
-        value: settings.follow_cursor.toString(),
-      });
-
       if (settings.auto_start) {
         await invoke("enable_autostart");
       } else {
         await invoke("disable_autostart");
       }
 
-      // Handle admin launch setting
+      // 处理管理员启动设置
       if (settings.admin_launch) {
         await invoke("enable_admin_launch");
       } else {
@@ -215,7 +222,7 @@ export function Settings() {
     <div
       className={cn(
         "h-screen flex flex-col bg-muted/40 overflow-hidden p-3 gap-3",
-        !themeReady && "[&_*]:!transition-none",
+        !themeReady && "**:transition-none!",
       )}
     >
       <WindowTitleBar
@@ -300,6 +307,8 @@ export function Settings() {
                   }
                 />
               )}
+
+              {activeTab === "appfilter" && <AppFilterTab />}
 
               {activeTab === "display" && <DisplayTab />}
 

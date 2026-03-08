@@ -1,4 +1,4 @@
-// ============ Text Preview Utilities ============
+// ============ 文本预览工具 ============
 
 export const TEXT_PREVIEW_CACHE_MAX_ITEMS = 180;
 export const TEXT_PREVIEW_MIN_W = 360;
@@ -92,7 +92,7 @@ export function sampleTextPreview(text: string): TextPreviewSample {
   };
 }
 
-// ============ Text Preview Content Cache (LRU) ============
+// ============ 文本预览内容缓存 (LRU) ============
 
 const textPreviewContentCache = new Map<number, string>();
 

@@ -47,7 +47,7 @@ pub fn disable_admin_launch() -> Result<(), String> {
 
     let _ = crate::task_scheduler::delete_elevation_task();
 
-    // 清理旧版 AppCompatFlags\Layers 注册表项
+    // 清理旧版兼容性注册表项
     #[cfg(target_os = "windows")]
     cleanup_compat_flags();
 
@@ -157,7 +157,7 @@ pub fn restart_app() -> bool {
         return self_elevate();
     }
 
-    // 非管理员模式：通过 explorer.exe 确保非提权启动
+    // 非管理员：通过 explorer.exe 非提权启动
     launch_via_explorer()
 }
 

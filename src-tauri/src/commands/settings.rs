@@ -164,6 +164,15 @@ pub async fn reset_all_data(state: State<'_, Arc<AppState>>) -> Result<(), Strin
 // 始终使用 tauri_plugin_autostart（注册表 Run 键）。
 // 管理员模式下应用会在启动后自行提权，无需单独的自启动机制。
 
+/// 判断是否为便携版（同级目录无 NSIS 卸载程序）
+#[tauri::command]
+pub fn is_portable_mode() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| !d.join("unins000.exe").exists()))
+        .unwrap_or(true)
+}
+
 /// 检查自启动是否启用
 #[tauri::command]
 pub async fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
@@ -196,6 +205,111 @@ pub async fn disable_autostart(
     let repo = SettingsRepository::new(&state.db);
     let _ = repo.set("autostart_enabled", "false");
     Ok(())
+}
+
+// ============ 运行中应用列表（应用过滤选择器） ============
+
+#[derive(serde::Serialize, Clone)]
+pub struct RunningAppInfo {
+    pub name: String,
+    pub process: String,
+    pub icon: Option<String>,
+}
+
+/// 获取当前运行中的可见应用列表（用于应用过滤设置的可视化选择器）
+#[tauri::command]
+pub async fn get_running_apps(_state: State<'_, Arc<AppState>>) -> Result<Vec<RunningAppInfo>, String> {
+    #[cfg(target_os = "windows")]
+    {
+        use windows::Win32::Foundation::{HWND, LPARAM};
+        use windows::Win32::UI::WindowsAndMessaging::{
+            EnumWindows, GetWindowTextW, GetWindowThreadProcessId, IsWindowVisible,
+        };
+        use windows::Win32::System::Threading::{
+            OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+        };
+        use windows_core::BOOL;
+
+        struct EnumCtx {
+            self_pid: u32,
+            apps: Vec<(String, String, String)>, // (name, process, exe_path)
+        }
+
+        unsafe extern "system" fn enum_proc(hwnd: HWND, lparam: LPARAM) -> BOOL {
+            unsafe {
+                let ctx = &mut *(lparam.0 as *mut EnumCtx);
+
+                if !IsWindowVisible(hwnd).as_bool() {
+                    return BOOL(1);
+                }
+
+                let mut pid: u32 = 0;
+                GetWindowThreadProcessId(hwnd, Some(&mut pid));
+                if pid == 0 || pid == ctx.self_pid {
+                    return BOOL(1);
+                }
+
+                let mut title_buf = [0u16; 512];
+                let title_len = GetWindowTextW(hwnd, &mut title_buf);
+                if title_len <= 0 {
+                    return BOOL(1);
+                }
+                let title = String::from_utf16_lossy(&title_buf[..title_len as usize]);
+                if title.trim().is_empty() || title == "Program Manager" {
+                    return BOOL(1);
+                }
+
+                if let Ok(handle) = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid) {
+                    use windows::Win32::System::Threading::{QueryFullProcessImageNameW, PROCESS_NAME_FORMAT};
+                    let mut buf = [0u16; 1024];
+                    let mut size = buf.len() as u32;
+                    if QueryFullProcessImageNameW(
+                        handle,
+                        PROCESS_NAME_FORMAT(0),
+                        windows::core::PWSTR::from_raw(buf.as_mut_ptr()),
+                        &mut size,
+                    ).is_ok() && size > 0 {
+                        let path = String::from_utf16_lossy(&buf[..size as usize]);
+                        let process = path.split('\\').next_back().unwrap_or(&path).to_string();
+                        ctx.apps.push((title, process, path));
+                    }
+                    let _ = windows::Win32::Foundation::CloseHandle(handle);
+                }
+
+                BOOL(1)
+            }
+        }
+
+        let mut ctx = EnumCtx {
+            self_pid: std::process::id(),
+            apps: Vec::new(),
+        };
+
+        unsafe {
+            let _ = EnumWindows(Some(enum_proc), LPARAM(&mut ctx as *mut _ as isize));
+        }
+
+        // 去重（按进程名）并提取图标
+        ctx.apps.sort_by(|a, b| a.1.to_lowercase().cmp(&b.1.to_lowercase()));
+        ctx.apps.dedup_by(|a, b| a.1.to_lowercase() == b.1.to_lowercase());
+
+        let config = crate::config::AppConfig::load();
+        let icons_dir = config.get_data_dir().join("icons");
+
+        let result: Vec<RunningAppInfo> = ctx.apps.into_iter().map(|(_title, process, exe_path)| {
+            let name = crate::clipboard::source_app::get_app_display_name_pub(&exe_path);
+            let cache_key = crate::clipboard::source_app::compute_icon_cache_key_pub(&exe_path);
+            let icon = crate::clipboard::source_app::extract_and_cache_icon(&exe_path, &icons_dir, &cache_key);
+            RunningAppInfo { name, process, icon }
+        }).collect();
+
+        Ok(result)
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        Ok(Vec::new())
+    }
 }
 
 // ============ 系统主题命令 ============
@@ -250,7 +364,7 @@ fn read_accent_color_from_registry() -> Option<String> {
         .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Explorer\Accent")
         .ok()?;
     let color_value: u32 = accent_key.get_value("AccentColorMenu").ok()?;
-    // ABGR 格式
+    // ABGR 格式解析
     let r = (color_value & 0xFF) as f64;
     let g = ((color_value >> 8) & 0xFF) as f64;
     let b = ((color_value >> 16) & 0xFF) as f64;
@@ -285,13 +399,12 @@ pub fn start_accent_color_watcher(app_handle: tauri::AppHandle) {
                     // 读取 lParam 中的 null 结尾宽字符串
                         let len = (0usize..256).find(|&i| *ptr.add(i) == 0).unwrap_or(0);
                         let slice = std::slice::from_raw_parts(ptr, len);
-                        if slice == windows::core::w!("ImmersiveColorSet").as_wide() {
-                            if let Some(handle) = WATCHER_APP_HANDLE.get() {
+                        if slice == windows::core::w!("ImmersiveColorSet").as_wide()
+                            && let Some(handle) = WATCHER_APP_HANDLE.get() {
                                 use tauri::Emitter;
                                 let color = read_accent_color_from_registry();
                                 let _ = handle.lock().emit("system-accent-color-changed", color);
                             }
-                        }
                     }
                 }
                 DefWindowProcW(hwnd, msg, wparam, lparam)
@@ -308,7 +421,7 @@ pub fn start_accent_color_watcher(app_handle: tauri::AppHandle) {
             RegisterClassW(&wc);
 
             // 创建隐藏顶级窗口接收广播消息
-            // 注意：不能用 HWND_MESSAGE，纯消息窗口无法收到 WM_SETTINGCHANGE 广播
+            // 不能用 HWND_MESSAGE，纯消息窗口无法收 WM_SETTINGCHANGE
             let _ = CreateWindowExW(
                 WINDOW_EX_STYLE::default(),
                 class_name,
@@ -324,7 +437,7 @@ pub fn start_accent_color_watcher(app_handle: tauri::AppHandle) {
                 None,
             );
 
-            // 消息循环（阻塞直到 WM_QUIT）
+            // 消息循环
             let mut msg = MSG::default();
             while GetMessageW(&mut msg, None, 0, 0).as_bool() {
                 let _ = TranslateMessage(&msg);
@@ -340,13 +453,12 @@ pub async fn get_system_accent_color() -> Result<Option<String>, String> {
     #[cfg(target_os = "windows")]
     {
         unsafe {
-            // 方式一：注册表 AccentColorMenu（用户实际选择的强调色）
+            // 优先注册表 AccentColorMenu
             if let Some(color) = read_accent_color_from_registry() {
                 return Ok(Some(color));
             }
 
-            // 方式二：回退到 DwmGetColorizationColor
-            // 注意：此值为 DWM 窗口边框混合色，因透明度混合可能与用户选择的强调色不同
+            // 回退 DwmGetColorizationColor（DWM 混合色，可能与强调色略有差异）
             use windows::Win32::Graphics::Dwm::DwmGetColorizationColor;
             use windows_core::BOOL;
 

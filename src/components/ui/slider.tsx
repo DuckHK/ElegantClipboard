@@ -3,7 +3,7 @@ import * as SliderPrimitive from "@radix-ui/react-slider"
 import { cn } from "@/lib/utils"
 
 interface SliderProps extends React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root> {
-  /** Visual style variant */
+  /** 视觉样式变体 */
   variant?: "outline" | "solid"
 }
 

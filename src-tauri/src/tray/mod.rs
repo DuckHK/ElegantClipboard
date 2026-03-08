@@ -73,8 +73,7 @@ pub fn setup_tray(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
                         crate::commands::hide_preview_windows(tray.app_handle());
                         let _ = window.emit("window-hidden", ());
                     } else if !crate::keyboard_hook::was_recently_hidden(300) {
-                        // 若窗口刚被 handle_click_outside 隐藏（<300ms），
-                        // 说明本次托盘点击的意图是隐藏，不应再显示
+                        // 窗口刚被隐藏(<300ms)则跳过，避免立即重新显示
                         let _ = window.show();
                         crate::input_monitor::enable_mouse_monitoring();
                         crate::keyboard_hook::set_window_state(
@@ -99,7 +98,7 @@ fn handle_menu_event(app: &AppHandle, id: &str) {
         }
         "restart" => {
             // 使用支持 UAC 提权的重启逻辑
-            // （直接 app.restart() 不会触发管理员提权）
+            // app.restart() 不触发提权，用自定义重启
             if crate::admin_launch::restart_app() {
                 app.exit(0);
             } else {
