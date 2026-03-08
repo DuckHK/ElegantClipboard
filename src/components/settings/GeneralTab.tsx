@@ -21,6 +21,7 @@ export interface GeneralSettings {
   auto_start: boolean;
   admin_launch: boolean;
   is_running_as_admin: boolean;
+  is_portable: boolean;
   position_mode: PositionMode;
   log_to_file: boolean;
   log_file_path: string;

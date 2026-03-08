@@ -769,6 +769,7 @@ pub fn run() {
             commands::settings::reset_all_data,
             commands::settings::select_folder_for_settings,
             commands::settings::open_data_folder,
+            commands::settings::is_portable_mode,
             commands::settings::is_autostart_enabled,
             commands::settings::enable_autostart,
             commands::settings::disable_autostart,

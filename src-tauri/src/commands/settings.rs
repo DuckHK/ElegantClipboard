@@ -164,6 +164,15 @@ pub async fn reset_all_data(state: State<'_, Arc<AppState>>) -> Result<(), Strin
 // 始终使用 tauri_plugin_autostart（注册表 Run 键）。
 // 管理员模式下应用会在启动后自行提权，无需单独的自启动机制。
 
+/// 判断是否为便携版（同级目录无 NSIS 卸载程序）
+#[tauri::command]
+pub fn is_portable_mode() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|p| p.parent().map(|d| !d.join("unins000.exe").exists()))
+        .unwrap_or(true)
+}
+
 /// 检查自启动是否启用
 #[tauri::command]
 pub async fn is_autostart_enabled(app: tauri::AppHandle) -> Result<bool, String> {
