@@ -343,6 +343,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
 
     try {
       invoke("hide_image_preview").catch(() => {});
+      const uiState = useUISettings.getState();
       await invoke("show_text_preview", {
         text: textContent,
         winX,
@@ -352,7 +353,9 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
         align,
         theme,
         sharpCorners,
-        windowEffect: useUISettings.getState().windowEffect,
+        windowEffect: uiState.windowEffect,
+        fontFamily: uiState.previewFont || null,
+        fontSize: uiState.previewFontSize,
       });
       textPreviewVisibleRef.current = true;
     } catch (error) {
@@ -627,8 +630,10 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
               onWheel={handleTextWheel}
             >
               <pre
-                className="clipboard-content text-sm leading-relaxed text-foreground/90 whitespace-pre-wrap break-all m-0"
+                className="clipboard-content leading-relaxed text-foreground/90 whitespace-pre-wrap break-all m-0"
                 style={{
+                  fontFamily: "var(--card-font-family)",
+                  fontSize: "var(--card-font-size, 14px)",
                   display: "-webkit-box",
                   WebkitLineClamp: cardMaxLines,
                   WebkitBoxOrient: "vertical",

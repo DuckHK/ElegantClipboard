@@ -873,6 +873,7 @@ pub fn run() {
             commands::settings::enable_autostart,
             commands::settings::disable_autostart,
             commands::settings::get_system_accent_color,
+            commands::settings::get_system_fonts,
             commands::file_ops::check_files_exist,
             commands::file_ops::show_in_explorer,
             commands::file_ops::paste_as_path,
