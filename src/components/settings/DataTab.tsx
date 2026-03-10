@@ -58,13 +58,13 @@ type DedupStrategy = "move_to_top" | "ignore" | "always_new";
 type TextDedupMode = "semantic" | "strict";
 
 const dedupOptions: { value: DedupStrategy; label: string; desc: string }[] = [
-  { value: "move_to_top", label: "置顶已有", desc: "相同内容移到最前" },
-  { value: "ignore", label: "忽略", desc: "不记录重复内容" },
-  { value: "always_new", label: "总是新建", desc: "每次都创建新条目" },
+  { value: "move_to_top", label: "置顶已有", desc: "将已有记录更新到最新" },
+  { value: "ignore", label: "忽略", desc: "丢弃重复内容，保留原记录" },
+  { value: "always_new", label: "总是新建", desc: "不去重，允许重复记录" },
 ];
 const textDedupModeOptions: { value: TextDedupMode; label: string; desc: string }[] = [
-  { value: "semantic", label: "语义去重", desc: "忽略格式噪声（推荐）" },
-  { value: "strict", label: "严格去重", desc: "按原始内容逐字节判断" },
+  { value: "semantic", label: "语义去重", desc: "忽略空白和格式差异（推荐）" },
+  { value: "strict", label: "严格去重", desc: "内容完全一致才视为重复" },
 ];
 
 interface DedupStrategyCardProps {
