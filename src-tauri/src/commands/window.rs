@@ -11,9 +11,16 @@ pub(crate) fn save_window_size_if_enabled<R: tauri::Runtime>(
     if let Some(state) = app.try_state::<std::sync::Arc<AppState>>() {
         let settings_repo = database::SettingsRepository::new(&state.db);
         // 始终记录窗口位置，供「上一次位置」模式跨重启恢复
-        if let Ok(pos) = window.outer_position() {
-            let _ = settings_repo.set("window_x", &pos.x.to_string());
-            let _ = settings_repo.set("window_y", &pos.y.to_string());
+        match window.outer_position() {
+            Ok(pos) => {
+                if let Err(e) = settings_repo.set("window_x", &pos.x.to_string()) {
+                    tracing::warn!("保存 window_x 失败: {}", e);
+                }
+                if let Err(e) = settings_repo.set("window_y", &pos.y.to_string()) {
+                    tracing::warn!("保存 window_y 失败: {}", e);
+                }
+            }
+            Err(e) => tracing::warn!("读取窗口位置失败: {}", e),
         }
 
         let persist = settings_repo
@@ -28,8 +35,12 @@ pub(crate) fn save_window_size_if_enabled<R: tauri::Runtime>(
         {
             let w = (size.width as f64 / scale).round() as u32;
             let h = (size.height as f64 / scale).round() as u32;
-            let _ = settings_repo.set("window_width", &w.to_string());
-            let _ = settings_repo.set("window_height", &h.to_string());
+            if let Err(e) = settings_repo.set("window_width", &w.to_string()) {
+                tracing::warn!("保存 window_width 失败: {}", e);
+            }
+            if let Err(e) = settings_repo.set("window_height", &h.to_string()) {
+                tracing::warn!("保存 window_height 失败: {}", e);
+            }
         }
     }
 }

@@ -223,7 +223,8 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
         fileValidityCache.set(cacheKey, allExist);
         if (!cancelled) setRuntimeFilesValid(allExist);
       })
-      .catch(() => {
+      .catch((error) => {
+        logError("Failed to check files exist:", error);
         if (!cancelled) setRuntimeFilesValid(undefined);
       });
 
@@ -302,10 +303,14 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
     textScrollPendingDeltaRef.current = 0;
     if (closingLease !== null) {
       textPreviewVisibleRef.current = false;
-      invoke("hide_text_preview", { token: closingLease }).catch(() => {});
+      invoke("hide_text_preview", { token: closingLease }).catch((error) => {
+        logError("Failed to hide text preview:", error);
+      });
     } else if (textPreviewVisibleRef.current) {
       textPreviewVisibleRef.current = false;
-      invoke("hide_text_preview").catch(() => {});
+      invoke("hide_text_preview").catch((error) => {
+        logError("Failed to hide text preview:", error);
+      });
     }
   }, [clearTextPreviewTimer]);
 
@@ -322,7 +327,8 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
         setCachedTextPreviewContent(item.id, resolved);
       }
       return resolved;
-    } catch {
+    } catch (error) {
+      logError("Failed to load full text content for preview:", error);
       return inlineText;
     }
   }, [isTextLikeContent, item.id, item.preview, item.text_content]);
@@ -374,7 +380,9 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
       document.documentElement.classList.contains("dark") ? "dark" : "light";
 
     try {
-      invoke("hide_image_preview").catch(() => {});
+      invoke("hide_image_preview").catch((error) => {
+        logError("Failed to hide image preview:", error);
+      });
       const uiState = useUISettings.getState();
       await invoke("show_text_preview", {
         text: textContent,
@@ -393,7 +401,9 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
       if (!textPreviewHoveringRef.current || reqId !== textPreviewReqIdRef.current || !isTextPreviewLeaseCurrent(lease)) {
         textPreviewVisibleRef.current = false;
         if (!isTextPreviewWanted()) {
-          invoke("hide_text_preview", { token: lease }).catch(() => {});
+          invoke("hide_text_preview", { token: lease }).catch((error) => {
+            logError("Failed to hide text preview after stale show:", error);
+          });
         }
         return;
       }
@@ -434,7 +444,10 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
         const deltaY = textScrollPendingDeltaRef.current;
         textScrollPendingDeltaRef.current = 0;
         if (deltaY === 0 || !textPreviewVisibleRef.current) return;
-        emitTo("text-preview", "text-preview-scroll", { deltaY }).catch(() => {});
+        emitTo("text-preview", "text-preview-scroll", { deltaY }).catch((error) => {
+          textPreviewVisibleRef.current = false;
+          logError("Failed to emit text preview scroll:", error);
+        });
       });
     }
   }, []);
