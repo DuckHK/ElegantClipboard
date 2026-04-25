@@ -572,7 +572,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
       <Card
         className={cn(
         "group relative cursor-pointer overflow-hidden shadow-none dark:shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.09),0_2px_8px_-1px_rgba(0,0,0,0.5)] hover:shadow-sm dark:hover:shadow-[inset_0_0.5px_0_0_rgba(255,255,255,0.12),0_4px_12px_-2px_rgba(0,0,0,0.6)] hover:border-primary/30 ring-1 ring-black/4 dark:ring-white/10",
-          isDragOverlay && "shadow-lg border-primary cursor-move",
+          isDragOverlay && "shadow-lg border-primary cursor-grabbing",
           justPasted && "animate-paste-flash",
           isActive && "bg-accent shadow-sm",
           batchMode && isSelected && "bg-primary/5",
@@ -590,7 +590,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
               data-drag-handle="true"
               onClick={(e) => e.stopPropagation()}
               className={cn(
-                "absolute inset-y-0 left-0 z-10 flex items-center justify-center rounded-l-lg cursor-grab active:cursor-move",
+                "absolute inset-y-0 left-0 z-10 flex items-center justify-center rounded-l-lg cursor-grab active:cursor-grabbing",
                 showDragAreaIndicator
                   ? "border-r border-dashed border-primary/40 bg-primary/15 text-primary opacity-0 group-hover:opacity-90 transition-[opacity,colors] duration-150 hover:bg-primary/25 hover:text-primary"
                   : "border-r border-transparent bg-transparent text-transparent opacity-0",
@@ -614,7 +614,7 @@ export const ClipboardItemCard = memo(function ClipboardItemCard({
               data-drag-handle="true"
               onClick={(e) => e.stopPropagation()}
               className={cn(
-                "absolute inset-y-0 right-0 z-10 flex items-center justify-center rounded-r-lg cursor-grab active:cursor-move",
+                "absolute inset-y-0 right-0 z-10 flex items-center justify-center rounded-r-lg cursor-grab active:cursor-grabbing",
                 showDragAreaIndicator
                   ? "border-l border-dashed border-primary/40 bg-primary/15 text-primary opacity-0 group-hover:opacity-90 transition-[opacity,colors] duration-150 hover:bg-primary/25 hover:text-primary"
                   : "border-l border-transparent bg-transparent text-transparent opacity-0",
