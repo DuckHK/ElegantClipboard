@@ -450,5 +450,5 @@ textarea,
 /* Dragging cursor - from QuickClipboard optimization */
 body.dragging-cursor,
 body.dragging-cursor * {
-    cursor: grabbing !important;
+    cursor: move !important;
 }
