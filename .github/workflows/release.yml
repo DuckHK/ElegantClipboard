@@ -81,9 +81,12 @@ jobs:
           $arch = "${{ matrix.arch }}"
           $src = "src-tauri/target/${{ matrix.rust-target }}/release/elegant-clipboard.exe"
           Copy-Item $src "ElegantClipboard_${v}_${arch}_portable.exe"
-
+          
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: ElegantClipboard_${{ steps.version.outputs.VERSION }}_${{ matrix.arch }}
-          path: ElegantClipboard_*_portable.exe
+          path: |
+            ElegantClipboard_*_portable.exe
+            src-tauri/target/${{ matrix.rust-target }}/release/bundle/nsis/*-setup.exe
+
