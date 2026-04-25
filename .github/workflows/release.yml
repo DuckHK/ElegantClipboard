@@ -1,9 +1,11 @@
 name: Release
-
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号（例如 1.0.0，不需要加 v）'
+        required: false
+        default: '0.0.1'
 
 jobs:
   build-and-release:
@@ -21,38 +23,32 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Extract version from tag (v0.6.0 → 0.6.0)
-      - name: Extract version from tag
+      - name: Set version
         id: version
         shell: bash
-        run: echo "VERSION=${GITHUB_REF_NAME#v}" >> $GITHUB_OUTPUT
+        run: echo "VERSION=${{ github.event.inputs.version }}" >> $GITHUB_OUTPUT
 
-      # Sync version in package.json, tauri.conf.json, Cargo.toml
       - name: Bump version to ${{ steps.version.outputs.VERSION }}
         shell: pwsh
         run: |
           $v = "${{ steps.version.outputs.VERSION }}"
           $root = $env:GITHUB_WORKSPACE
-
           # package.json
           $pkgPath = Join-Path $root "package.json"
           $pkg = Get-Content $pkgPath -Raw | ConvertFrom-Json
           $pkg.version = $v
           $pkg | ConvertTo-Json -Depth 10 | Set-Content $pkgPath -Encoding utf8NoBOM
-
           # src-tauri/tauri.conf.json
           $tauriPath = Join-Path $root "src-tauri\tauri.conf.json"
           $tauri = Get-Content $tauriPath -Raw | ConvertFrom-Json
           $tauri.version = $v
           $tauri | ConvertTo-Json -Depth 10 | Set-Content $tauriPath -Encoding utf8NoBOM
-
           # src-tauri/Cargo.toml
           $cargoPath = Join-Path $root "src-tauri\Cargo.toml"
           $cargo = Get-Content $cargoPath -Raw
           $cargo = $cargo -replace '(?m)^(version\s*=\s*")[^"]*(")', "`${1}$v`${2}"
           Set-Content $cargoPath $cargo -Encoding utf8NoBOM -NoNewline
-
-          Write-Host "Version synced to $v in all 3 files"
+          Write-Host "Version synced to $v"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -74,18 +70,9 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build and release
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          UPDATER_GITHUB_TOKEN: ${{ secrets.UPDATER_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: "ElegantClipboard ${{ github.ref_name }}"
-          releaseBody: "See the assets to download and install."
-          releaseDraft: true
-          prerelease: false
-          args: --target ${{ matrix.rust-target }}
+      - name: Build
+        shell: bash
+        run: npm run tauri build -- --target ${{ matrix.rust-target }}
 
       - name: Rename portable exe
         shell: pwsh
@@ -95,11 +82,8 @@ jobs:
           $src = "src-tauri/target/${{ matrix.rust-target }}/release/elegant-clipboard.exe"
           Copy-Item $src "ElegantClipboard_${v}_${arch}_portable.exe"
 
-      - name: Upload portable to release
-        uses: softprops/action-gh-release@v2
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          tag_name: ${{ github.ref_name }}
-          draft: true
-          files: ElegantClipboard_*_portable.exe
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          name: ElegantClipboard_${{ steps.version.outputs.VERSION }}_${{ matrix.arch }}
+          path: ElegantClipboard_*_portable.exe
