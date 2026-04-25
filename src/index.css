@@ -452,3 +452,7 @@ body.dragging-cursor,
 body.dragging-cursor * {
     cursor: move !important;
 }
+
+[data-drag-handle="true"] {
+    cursor: move !important;
+}
